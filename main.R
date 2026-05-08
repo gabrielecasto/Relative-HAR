@@ -11,7 +11,6 @@ rm(list = ls()); gc()
 # Connect to the scripts of the same working directory
 sources <- c(
   "setup.R",
-  "config.R",
   "import.R",
   "cleaning.R"
 )
@@ -42,11 +41,11 @@ TICKERS <- c(GetSp500Tickers(), "SPY")
 # Import minute level data
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   tickers = TICKERS,
-  from_date = as.Date("2020-02-01"),
+  from_date = as.Date("2021-01-01"),
   to_date = as.Date("2021-01-31"),
   multiplier = 1,
   timespan = "minute",
-  sleep_sec = 0.1,
+  sleep_sec = 0.01,
   verbose = TRUE
 )
 
@@ -67,7 +66,7 @@ rm(out);invisible(gc())
 # We perform the first stage of cleaning in which we drop all the tickers that
 # have less than x% of expected observations
 
-PRICES <- FilterA(Coverage_Threshold = 0.9)
+PRICES <- FilterA(Coverage_Threshold = 0.5)
 
 # We perform the second stage of cleaning in which we drop all the tickers that
 # i) A day is classified as having a large gap if the maximum number of
