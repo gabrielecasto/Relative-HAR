@@ -6,7 +6,7 @@
 #________________________________PREPARATION____________________________________
 
 # Clean the environment
-#rm(list = ls()); gc()
+rm(list = ls()); gc()
 
 # Connect to the scripts of the same working directory
 sources <- c(
@@ -28,6 +28,7 @@ invisible(lapply(sources,source))
 
 # Use API key
 # Polygon API key from local environment variable
+readRenviron(".Renviron")
 POLYGON_KEY <- Sys.getenv("POLYGON_API_KEY")
 
 if (!nzchar(POLYGON_KEY)) {
@@ -64,10 +65,9 @@ TRADING_DAYS <- out$TRADING_DAYS
 rm(out);invisible(gc())
 
 # We perform the first stage of cleaning in which we drop all the tickers that
-# have less than x% (defined in config as COVERAGE_TRESHOLD)
-# of expected observations
+# have less than x% of expected observations
 
-PRICES <- FilterA(Coverage_Threshold = COVERAGE_TRESHOLD)
+PRICES <- FilterA(Coverage_Threshold = 0.9)
 
 # We perform the second stage of cleaning in which we drop all the tickers that
 # i) A day is classified as having a large gap if the maximum number of
@@ -77,9 +77,9 @@ PRICES <- FilterA(Coverage_Threshold = COVERAGE_TRESHOLD)
 # iii) A ticker is removed if the maximum intraday gap observed on any single
 #      day exceeds Max_Gap_Allowed.
 
-PRICES <- FilterB(Minutes_Big_Gap = GAP_THR_DAY,
-                  Maximum_N_Big_Gaps = BIG_GAP_THR,
-                  Max_Gap_Allowed = MAX_GAP_ANY)
+PRICES <- FilterB(Minutes_Big_Gap = 10,
+                  Maximum_N_Big_Gaps = 0.10,
+                  Max_Gap_Allowed = 20)
 
 # Fill missing prices per ticker by carrying the last observation forward (LOCF)
 # and then backward (NOCB) to eliminate internal and edge NAs; store the filled
@@ -92,7 +92,7 @@ PRICES_FILLED <- FillMissingPrices()
 # filling minutes with no data. In early close days this leads to a 0 return
 # for minutes in which market is closed early.
 
-out1 <- EarlyClose(ZeroShareThreshold = ZERO_SHARE_THR)
+out1 <- EarlyClose(ZeroShareThreshold = 0.9)
 DT <- out1$DT
 tickers <- out1$tickers
 rm(out1);invisible(gc())
