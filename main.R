@@ -12,7 +12,8 @@
 sources <- c(
   "import.R",
   "cleaning.R",
-  "setup.R"
+  "setup.R",
+  "config.R" # To remove
 )
 
 stopifnot(all(file.exists(sources)))
@@ -24,6 +25,12 @@ invisible(lapply(sources,source))
 
 # In this section we import the tickers that compose the SP500 index and the
 # minute-level closing prices for each stock.
+
+# Use API key
+api_key <- Sys.getenv("POLYGON_API_KEY")
+if (api_key == "") {
+  stop("Missing POLYGON_API_KEY. Please create a local .Renviron file.")
+}
 
 # Import SP500 tickers
 TICKERS <- c(GetSp500Tickers(), "SPY")
