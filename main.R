@@ -27,9 +27,12 @@ invisible(lapply(sources,source))
 # minute-level closing prices for each stock.
 
 # Use API key
-api_key <- Sys.getenv("POLYGON_API_KEY")
-if (api_key == "") {
-  stop("Missing POLYGON_API_KEY. Please create a local .Renviron file.")
+# Polygon API key from local environment variable
+POLYGON_KEY <- Sys.getenv("POLYGON_API_KEY")
+
+if (!nzchar(POLYGON_KEY)) {
+  stop("Missing POLYGON_API_KEY. Please create a local .Renviron file.", call.
+       = FALSE)
 }
 
 # Import SP500 tickers

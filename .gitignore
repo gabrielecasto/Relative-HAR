@@ -1,5 +1,6 @@
 .Renviron
 .env
-.Rhistory
+polygon_key.txt
 .RData
+.Rhistory
 .DS_Store
