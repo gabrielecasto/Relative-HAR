@@ -10,10 +10,10 @@
 
 # Connect to the scripts of the same working directory
 sources <- c(
-  "import.R",
-  "cleaning.R",
   "setup.R",
-  "config.R" # To remove
+  "config.R",
+  "import.R",
+  "cleaning.R"
 )
 
 stopifnot(all(file.exists(sources)))

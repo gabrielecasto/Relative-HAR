@@ -1,16 +1,6 @@
 
 # In this section we are defining global variables
 
-# Starting date and ending date of the period in analysis
-STARTING_DATE <- as.Date("2019-08-01")
-TO_DATE <- as.Date("2021-01-31")
-
-
-
-# Polygon key (local file)
-POLYGON_KEY_PATH <- "~/Desktop/PROGETTO_VOLATILITÀ/polygon_key.txt"
-POLYGON_KEY <- readLines(POLYGON_KEY_PATH, warn = FALSE)[1]
-
 
 
 # Filter A coverage threshold
