@@ -193,7 +193,7 @@ BuildWideIntradayDf <- function(tickers, from_date, to_date, multiplier = 1,
     
     
     
-#____________________________PATCH_BAD_TICKER_DAYS__________________________
+#____________________________PATCH_BAD_TICKER_DAYS______________________________
   
 # In this section we patch extreme missingness that can arise from intermittent
 # API failures in large parallel downloads. We identify (date, ticker) pairs

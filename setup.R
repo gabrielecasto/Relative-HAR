@@ -30,3 +30,7 @@ future::plan(future::multisession,
 
 progressr::handlers(global = TRUE)
 progressr::handlers("txtprogressbar")
+
+
+
+#_____________________________END_OF_THE_SCRIPT_________________________________
