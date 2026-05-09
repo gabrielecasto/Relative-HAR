@@ -3,7 +3,7 @@
 
 # In this section we will clean the data dropping some tickers with later
 # specified criteria, filling eventual missing data and producing an output
-# suitable for the following part of the process. AAAAA
+# suitable for the following part of the process.
 
 
 
