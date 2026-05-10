@@ -9,8 +9,8 @@
 
 packages <- c("jsonlite", "dplyr", "purrr", "data.table", "tidyquant", 
               "lubridate", "httr", "hms", "ggplot2", "future.apply", "stringr",
-              "data.table", "here", "transport", "future", "progressr",
-              "future", "rvest", "tidyr", "tibble", "MASS", "glmnet")
+              "here", "transport", "future", "progressr", "rvest", "tidyr",
+              "tibble", "MASS", "glmnet", "arrow")
 
 to_install <- packages[!(packages %in% installed.packages()[, "Package"])]
 if (length(to_install) > 0) install.packages(to_install)
