@@ -25,7 +25,8 @@ invisible(lapply(sources,source))
 
 # In this section we import the tickers that compose the SP500 index and the
 # minute-level closing prices for each stock. We also import sector ETFs
-# and SPY.
+# and SPY. Sector ETFs can be defined in "Sectors.R" in the function
+# GetSectorSTFMap().
 
 # Use API key
 # Polygon API key from local environment variable
@@ -46,7 +47,7 @@ TICKER_SECTOR_TABLE <- AddSectorEtf(ticker_sector_table = TICKER_SECTOR_TABLE,
                                     sector_etf_map = GetSectorETFMap())
 
 # Find ETFs to download
-ETFS <- unique(TICKER_SECTOR_TABLE$sector_etf)
+ETFS <- unique(stats::na.omit(TICKER_SECTOR_TABLE$sector_etf))
 
 # Import minute level data for SP500 tickers, SPY and sector ETFs
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(
@@ -76,7 +77,7 @@ rm(out);invisible(gc())
 # We perform the first stage of cleaning in which we drop all the tickers that
 # have less than x% of expected observations
 
-PRICES <- FilterA(Coverage_Threshold = 0.9)
+PRICES <- FilterA(Coverage_Threshold = 0.5)
 
 # We perform the second stage of cleaning in which we drop all the tickers that
 # i) A day is classified as having a large gap if the maximum number of
