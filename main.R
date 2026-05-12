@@ -18,7 +18,8 @@ sources <- c(
   "setup.R",
   "import.R",
   "cleaning.R",
-  "sectors.R"
+  "sectors.R",
+  "analysis.R"
 )
 
 stopifnot(all(file.exists(sources)))
