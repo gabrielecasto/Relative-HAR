@@ -57,7 +57,8 @@ INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   multiplier = 1,
   timespan = "minute",
   sleep_sec = 0.01,
-  verbose = TRUE
+  verbose = TRUE,
+  NA_Share_Threshold = 0.5
 )
 
 
@@ -77,7 +78,7 @@ rm(out);invisible(gc())
 # We perform the first stage of cleaning in which we drop all the tickers that
 # have less than x% of expected observations
 
-PRICES <- FilterA(Coverage_Threshold = 0.5)
+PRICES <- FilterA(Coverage_Threshold = 0.9)
 
 # We perform the second stage of cleaning in which we drop all the tickers that
 # i) A day is classified as having a large gap if the maximum number of
