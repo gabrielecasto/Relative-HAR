@@ -23,7 +23,8 @@ invisible(lapply(sources,source))
 #_______________________________IMPORT_DATA_____________________________________
 
 # In this section we import the tickers that compose the SP500 index and the
-# minute-level closing prices for each stock.
+# minute-level closing prices for each stock. We also import sector ETFs
+# and SPY.
 
 # Use API key
 # Polygon API key from local environment variable
@@ -36,7 +37,7 @@ if (!nzchar(POLYGON_KEY)) {
 }
 
 # Import SP500 tickers
-TICKERS <- c(GetSp500Tickers(), "SPY")
+STOCK_TICKERS <- c(GetSp500Tickers())
 
 # Import minute level data
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(

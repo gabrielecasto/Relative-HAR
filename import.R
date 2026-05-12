@@ -9,17 +9,15 @@
 
 #___________________________IMPORT_SP500_TICKERS________________________________
 
-# Improt SP500 tickers using Slickcharts as a primary source, if the number of
+# Improt SP500 tickers using Wikipedia as a primary source, if the number of
 # imported tickers falls below 400, we use tidyquant as a fallback to import
 # tickers.
 
-# Slickcharts (primary)
-GetSp500TickersSlickcharts <- function() {
-  url <- "https://www.slickcharts.com/sp500"
+# Wikipedia (primary)
+GetSp500TickersWikipedia <- function() {
+  url <- "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
   tbl <- url %>% rvest::read_html() %>% rvest::html_table() %>% .[[1]]
-  tickers <- tbl$Symbol
-  tickers <- tickers[!is.na(tickers) & tickers != ""]
-  tickers <- unique(tickers)
+  tickers <- as.list(tbl$Symbol)
   return(tickers)
 }
 
@@ -32,9 +30,9 @@ GetSp500TickersTidyquant <- function() {
 
 # Wrapper
 GetSp500Tickers <- function(verbose = TRUE) {
-  x <- try(GetSp500TickersSlickcharts(), silent = TRUE)
+  x <- try(GetSp500TickersWikipedia(), silent = TRUE)
   if (!inherits(x, "try-error") && length(x) >= 400) {
-    if (verbose) message("Using tickers from Slickcharts")
+    if (verbose) message("Using tickers from Wikipedia")
     return(x)
   }
   if (verbose) message("Fallback: using tidyquant")
