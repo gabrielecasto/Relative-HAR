@@ -12,7 +12,8 @@ rm(list = ls()); gc()
 sources <- c(
   "setup.R",
   "import.R",
-  "cleaning.R"
+  "cleaning.R",
+  "sectors.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -39,9 +40,17 @@ if (!nzchar(POLYGON_KEY)) {
 # Import SP500 tickers
 STOCK_TICKERS <- c(GetSp500Tickers())
 
-# Import minute level data
+# Add sectors and relative sector ETF
+TICKER_SECTOR_TABLE <- GetSp500SectorsWikipedia(tickers = STOCK_TICKERS)
+TICKER_SECTOR_TABLE <- AddSectorEtf(ticker_sector_table = TICKER_SECTOR_TABLE,
+                                    sector_etf_map = GetSectorETFMap())
+
+# Find ETFs to download
+ETFS <- unique(TICKER_SECTOR_TABLE$sector_etf)
+
+# Import minute level data for SP500 tickers, SPY and sector ETFs
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(
-  tickers = TICKERS,
+  tickers = c(STOCK_TICKERS, "SPY", ETFS),
   from_date = as.Date("2020-01-01"),
   to_date = as.Date("2021-01-31"),
   multiplier = 1,
