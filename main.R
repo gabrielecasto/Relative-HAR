@@ -6,7 +6,12 @@
 #________________________________PREPARATION____________________________________
 
 # Clean the environment
-rm(list = ls()); gc()
+#rm(list = ls()); gc()
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 # Connect to the scripts of the same working directory
 sources <- c(
@@ -52,13 +57,13 @@ ETFS <- unique(stats::na.omit(TICKER_SECTOR_TABLE$sector_etf))
 # Import minute level data for SP500 tickers, SPY and sector ETFs
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   tickers = c(STOCK_TICKERS, "SPY", ETFS),
-  from_date = as.Date("2020-01-01"),
-  to_date = as.Date("2021-01-31"),
+  from_date = as.Date("2022-01-01"),
+  to_date = as.Date("2023-01-31"),
   multiplier = 1,
   timespan = "minute",
-  sleep_sec = 0.01,
+  sleep_sec = 0.1,
   verbose = TRUE,
-  NA_Share_Threshold = 0.8
+  NA_Share_Threshold = 0.9
 )
 
 
@@ -72,8 +77,7 @@ INTRADAY_WIDE_DF <- BuildWideIntradayDf(
 out <- MasterGridCompleteData()
 MASTER_GRID <- out$MASTER_GRID
 TRADING_DAYS <- out$TRADING_DAYS
-
-rm(out);invisible(gc())
+rm(out, STOCK_TICKERS); invisible(gc())
 
 # We perform the first stage of cleaning in which we drop all the tickers that
 # have less than x% of expected observations
@@ -92,12 +96,15 @@ PRICES <- FilterB(Minutes_Big_Gap = 10,
                   Maximum_N_Big_Gaps = 0.10,
                   Max_Gap_Allowed = 20)
 
+# Check if ETFS are in PIRCES
+suppressWarnings(ETFS[!(ETFS %in% names(PRICES))])
+
 # Fill missing prices per ticker by carrying the last observation forward (LOCF)
 # and then backward (NOCB) to eliminate internal and edge NAs; store the filled
 # panel as PRICES_FILLED and run basic sanity checks for NA/Inf/zero values.
 
 PRICES_FILLED <- FillMissingPrices()
-rm(PRICES, envir = .GlobalEnv);gc()
+rm(PRICES, envir = .GlobalEnv); invisible(gc())
 
 # In this section we remove the rows corresponding to minutes in which
 # at least x% of returns across all stocks is 0. This arises from locf and nocb
@@ -109,7 +116,8 @@ DT <- out1$DT
 tickers <- out1$tickers
 rm(out1);invisible(gc())
 
-
+# Check if ETFS are in DT
+suppressWarnings(setdiff(ETFS, colnames(DT)))
 
 
 
