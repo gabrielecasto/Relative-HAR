@@ -19,7 +19,8 @@ sources <- c(
   "import.R",
   "cleaning.R",
   "sectors.R",
-  "analysis.R"
+  "analysis.R",
+  "signature.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -62,7 +63,7 @@ INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   to_date = as.Date("2023-01-31"),
   multiplier = 1,
   timespan = "minute",
-  sleep_sec = 0.1,
+  sleep_sec = 0.3,
   verbose = TRUE,
   NA_Share_Threshold = 0.9
 )
@@ -78,12 +79,15 @@ INTRADAY_WIDE_DF <- BuildWideIntradayDf(
 out <- MasterGridCompleteData()
 MASTER_GRID <- out$MASTER_GRID
 TRADING_DAYS <- out$TRADING_DAYS
-rm(out, STOCK_TICKERS); invisible(gc())
+rm(out); invisible(gc())
 
 # We perform the first stage of cleaning in which we drop all the tickers that
 # have less than x% of expected observations
 
 PRICES <- FilterA(Coverage_Threshold = 0.9)
+
+# Check if ETFS are in PIRCES
+suppressWarnings(ETFS[!(ETFS %in% names(PRICES))])
 
 # We perform the second stage of cleaning in which we drop all the tickers that
 # i) A day is classified as having a large gap if the maximum number of
@@ -122,6 +126,49 @@ suppressWarnings(setdiff(ETFS, colnames(DT)))
 
 
 
+#_______________________________SIGNATURE_PLOT__________________________________
 
+STOCK_TICKERS_SIGNATURE <- intersect(
+  as.character(unlist(STOCK_TICKERS, use.names = FALSE)),
+  colnames(DT)
+)
 
+SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
+  DT = DT,
+  tickers = STOCK_TICKERS_SIGNATURE,
+  intervals = 1:150,
+  date_col_name = "datetime",
+  include_partial_last_block = TRUE,
+  minimum_days_required = 1,
+  show_progress = TRUE
+)
 
+SIGNATURE_AGGREGATE <- AggregateVolatilitySignature(
+  signature_by_stock = SIGNATURE_BY_STOCK
+)
+
+signature_plot <- ggplot2::ggplot(
+  SIGNATURE_AGGREGATE,
+  ggplot2::aes(x = interval_minutes)
+) +
+  ggplot2::geom_ribbon(
+    ggplot2::aes(
+      ymin = p25_mean_rv,
+      ymax = p75_mean_rv
+    ),
+    fill = "grey80",
+    alpha = 0.7
+  ) +
+  ggplot2::geom_line(
+    ggplot2::aes(y = median_mean_rv),
+    color = "red",
+    linewidth = 1
+  ) +
+  ggplot2::labs(
+    title = "Volatility Signature Plot",
+    x = "Sampling interval in minutes",
+    y = "Sample average realized volatility"
+  ) +
+  ggplot2::theme_minimal()
+
+print(signature_plot)
