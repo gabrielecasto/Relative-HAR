@@ -58,7 +58,7 @@ INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   timespan = "minute",
   sleep_sec = 0.01,
   verbose = TRUE,
-  NA_Share_Threshold = 0.5
+  NA_Share_Threshold = 0.8
 )
 
 
