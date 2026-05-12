@@ -97,6 +97,7 @@ PRICES <- FilterB(Minutes_Big_Gap = 10,
 # panel as PRICES_FILLED and run basic sanity checks for NA/Inf/zero values.
 
 PRICES_FILLED <- FillMissingPrices()
+rm(PRICES, envir = .GlobalEnv);gc()
 
 # In this section we remove the rows corresponding to minutes in which
 # at least x% of returns across all stocks is 0. This arises from locf and nocb

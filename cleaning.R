@@ -216,8 +216,6 @@ FillMissingPrices <- function() {
   # Final output in compact form
   PRICES_FILLED <- PRICES
   
-  rm(PRICES, envir = .GlobalEnv);gc()
-  
   # Check for NAs, Inf, 0
   DTp <- as.data.table(PRICES_FILLED)
   price_cols <- setdiff(names(DTp), "datetime")
@@ -260,8 +258,6 @@ EarlyClose <- function(ZeroShareThreshold) {
       r
     })
   )
-  
-  rm(PRICES_FILLED, envir = .GlobalEnv);gc()
   
   DT_lr <- as.data.table(LOG_RETURNS)
   ret_cols <- setdiff(names(DT_lr), "datetime")
