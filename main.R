@@ -139,8 +139,7 @@ suppressWarnings(setdiff(ETFS, colnames(DT)))
 
 
 # Set parallel plan for signature plot
-future::plan(future::multisession, workers = 
-               max(parallel::detectCores() - 1, 1))
+future::plan(future::multisession, workers = 4)
 cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 
 
@@ -149,17 +148,14 @@ STOCK_TICKERS_SIGNATURE <- intersect(
   colnames(DT)
 )
 
-progressr::handlers(global = TRUE)
-progressr::handlers("txtprogressbar")
-
 options(future.globals.maxSize = 8 * 1024^3)
 
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   DT = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
-  intervals = 1:40,
+  intervals = 1:30,
   date_col_name = "datetime",
-  include_partial_last_block = FALSE,
+  include_partial_last_block = TRUE,
   minimum_days_required = 1,
   show_progress = TRUE
 )
