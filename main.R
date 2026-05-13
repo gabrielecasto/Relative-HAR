@@ -19,9 +19,9 @@ sources <- c(
   "import.R",
   "cleaning.R",
   "sectors.R",
-  "analysis.R",
   "signature.R",
-  "signature_plots.R"
+  "signature_plots.R",
+  "HAR.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -130,7 +130,7 @@ rm(PRICES, envir = .GlobalEnv); invisible(gc())
 out1 <- EarlyClose(ZeroShareThreshold = 0.9)
 DT <- out1$DT
 tickers <- out1$tickers
-rm(out1);invisible(gc())
+rm(out1, PRICES_FILLED);invisible(gc())
 
 # Check if ETFS are in DT
 suppressWarnings(setdiff(ETFS, colnames(DT)))
@@ -162,6 +162,8 @@ SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   minimum_days_required = 1,
   show_progress = TRUE
 )
+
+rm(STOCK_TICKERS);invisible(gc())
 
 
 
@@ -247,9 +249,27 @@ future::plan(future::sequential)
 invisible(gc())
 cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
+rm(P_SIGNATURE_HEATMAP, P_SIGNATURE_SECTOR, P_SIGNATURE_SPAGHETTI,
+   SIGNATURE_AGGREGATE, SIGNATURE_SECTOR_SUMMARY, signature_plot,
+   SIGNATURE_PLOT_DF)
+invisible(gc())
 
 
 
+#____________________________________HAR________________________________________
+
+
+STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
+                       unique(TICKER_SECTOR_TABLE$sector_etf))
+
+DAILY_RV_10MIN <- BuildDailyRVPanel(
+  DF = DT,
+  tickers = STOCK_TICKERS_HAR,
+  interval_minutes = 10,
+  date_col_name = "datetime",
+  include_partial_last_block = FALSE,
+  minimum_blocks_required = 1
+)
 
 
 
