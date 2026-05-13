@@ -151,48 +151,11 @@ STOCK_TICKERS_SIGNATURE <- intersect(
 options(future.globals.maxSize = 8 * 1024^3)
 
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
-  DT = DT,
+  DF = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
-  intervals = 1:50,
+  intervals = 1:30,
   date_col_name = "datetime",
   include_partial_last_block = TRUE,
   minimum_days_required = 1,
   show_progress = TRUE
 )
-
-SIGNATURE_AGGREGATE <- AggregateVolatilitySignature(
-  signature_by_stock = SIGNATURE_BY_STOCK
-)
-
-SIGNATURE_AGGREGATE <- SIGNATURE_AGGREGATE %>%
-  dplyr::mutate(
-    median_mean_rv_ann_pct2 = median_mean_rv * 252 * 100^2,
-    p25_mean_rv_ann_pct2 = p25_mean_rv * 252 * 100^2,
-    p75_mean_rv_ann_pct2 = p75_mean_rv * 252 * 100^2
-  )
-
-signature_plot <- ggplot2::ggplot(
-  SIGNATURE_AGGREGATE,
-  ggplot2::aes(x = interval_minutes)
-) +
-  ggplot2::geom_ribbon(
-    ggplot2::aes(
-      ymin = p25_mean_rv_ann_pct2,
-      ymax = p75_mean_rv_ann_pct2
-    ),
-    fill = "grey80",
-    alpha = 0.7
-  ) +
-  ggplot2::geom_line(
-    ggplot2::aes(y = median_mean_rv_ann_pct2),
-    color = "red",
-    linewidth = 1
-  ) +
-  ggplot2::labs(
-    title = "Volatility Signature Plot",
-    x = "Sampling interval in minutes",
-    y = "Sample average realized volatility"
-  ) +
-  ggplot2::theme_minimal()
-
-print(signature_plot)

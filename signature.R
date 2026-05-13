@@ -11,8 +11,7 @@
 # interval-level log returns.
 # Example: interval_minutes = 5, r_5min = r_1 + r_2 + r_3 + r_4 + r_5
 
-BuildIntervalReturnsForTickerDay <- function(returns_1min,
-                                             interval_minutes,
+BuildIntervalReturnsForTickerDay <- function(returns_1min, interval_minutes,
                                              include_partial_last_block=TRUE) {
   
   if (interval_minutes < 1) {
@@ -82,24 +81,22 @@ ComputeRVForInterval <- function(returns_1min, interval_minutes,
 # daily RV across days; 3) returns one compact row per interval.
 # Important: daily blocks are always reset at the beginning of each trading day.
 
-ComputeSignatureForTicker <- function(DT,
-                                      ticker,
-                                      intervals = 1:150,
-                                      date_col_name = "date",
-                                      include_partial_last_block = TRUE,
-                                      minimum_days_required = 1) {
+ComputeSignatureForTicker <- function(DF, ticker, intervals,
+                                      date_col_name,
+                                      include_partial_last_block,
+                                      minimum_days_required) {
   
-  if (!ticker %in% names(DT)) {
-    stop(paste("Ticker", ticker, "not found in DT."), call. = FALSE)
+  if (!ticker %in% names(DF)) {
+    stop(paste("Ticker", ticker, "not found in DF."), call. = FALSE)
   }
   
-  if (!date_col_name %in% names(DT)) {
-    stop(paste("DT must contain the column", date_col_name), call. = FALSE)
+  if (!date_col_name %in% names(DF)) {
+    stop(paste("DF must contain the column", date_col_name), call. = FALSE)
   }
   
   # Keep only date and ticker returns
-  stock_data <- data.frame(date = as.Date(DT[[date_col_name]]),
-                           return = DT[[ticker]])
+  stock_data <- data.frame(date = as.Date(DF[[date_col_name]]),
+                           return = DF[[ticker]])
   
   # Split one-minute returns by trading day
   returns_by_day <- split(stock_data$return, stock_data$date)
@@ -156,129 +153,49 @@ ComputeSignatureForTicker <- function(DT,
 
 
 
-
 # This function computes the volatility signature for all selected tickers.
 # Output is one compact table with one row for each ticker and interval.
 # Important: daily RV values are computed internally but are not saved.
 
-BuildVolatilitySignature <- function(DT,
-                                     tickers,
-                                     intervals = 1:150,
-                                     date_col_name = "date",
-                                     include_partial_last_block = TRUE,
-                                     minimum_days_required = 1,
-                                     show_progress = TRUE) {
+BuildVolatilitySignature <- function(DF, tickers, intervals, date_col_name,
+                                     include_partial_last_block,
+                                     minimum_days_required,
+                                     show_progress) {
   
-  DT <- as.data.frame(DT)
+  DF <- as.data.frame(DF)
   date_col_name <- as.character(date_col_name)[1]
   
-  if (missing(tickers) || is.null(tickers)) {
-    tickers <- setdiff(names(DT), c("datetime", "date", "m"))
-  }
-  
   tickers <- as.character(unlist(tickers, use.names = FALSE))
-  tickers <- tickers[tickers %in% names(DT)]
+  tickers <- tickers[tickers %in% names(DF)]
   
   if (length(tickers) == 0) {
-    stop("No valid tickers found in DT.", call. = FALSE)
+    stop("No valid tickers found in DF.", call. = FALSE)
   }
   
-  if (show_progress) {
-    
-    signature_list <- progressr::with_progress({
+  # Progress bar
+  signature_list <- progressr::with_progress({
+    p <- progressr::progressor(steps = length(tickers))
       
-      p <- progressr::progressor(steps = length(tickers))
+    # Work in parallel
+    future.apply::future_lapply(tickers, function(ticker) {
       
-      future.apply::future_lapply(tickers, function(ticker) {
-        
-        out <- ComputeSignatureForTicker(
-          DT = DT,
-          ticker = ticker,
-          intervals = intervals,
-          include_partial_last_block = include_partial_last_block,
-          minimum_days_required = minimum_days_required,
-          date_col_name = date_col_name
-        )
-        
-        p(sprintf("ticker %s", ticker))
-        
-        return(out)
-      })
-    })
-    
-  } else {
-    
-    signature_list <- future.apply::future_lapply(tickers, function(ticker) {
-      
-      ComputeSignatureForTicker(
-        DT = DT,
+      out <- ComputeSignatureForTicker(
+        DF = DF,
         ticker = ticker,
         intervals = intervals,
         include_partial_last_block = include_partial_last_block,
         minimum_days_required = minimum_days_required,
         date_col_name = date_col_name
-      )
+        )
+      
+      p(sprintf("ticker %s", ticker))
+      
+      return(out)
+      })
     })
-  }
   
   signature_by_stock <- do.call(rbind, signature_list)
   rownames(signature_by_stock) <- NULL
   
   return(signature_by_stock)
-}
-
-
-
-# This function aggregates the volatility signature across stocks.
-# Input is one row for each ticker and interval. Output is one row for each
-# interval, with cross-sectional median and dispersion.
-
-AggregateVolatilitySignature <- function(signature_by_stock) {
-  
-  required_cols <- c("interval_minutes", "mean_rv")
-  
-  if (!all(required_cols %in% names(signature_by_stock))) {
-    stop("signature_by_stock must contain 'interval_minutes' and 'mean_rv'.",
-         call. = FALSE)
-  }
-  
-  intervals <- sort(unique(signature_by_stock$interval_minutes))
-  
-  aggregate_list <- lapply(intervals, function(interval_minutes) {
-    
-    rv_values <- signature_by_stock$mean_rv[
-      signature_by_stock$interval_minutes == interval_minutes
-    ]
-    
-    rv_values <- rv_values[is.finite(rv_values)]
-    
-    if (length(rv_values) == 0) {
-      return(data.frame(
-        interval_minutes = interval_minutes,
-        median_mean_rv = NA_real_,
-        p10_mean_rv = NA_real_,
-        p25_mean_rv = NA_real_,
-        p75_mean_rv = NA_real_,
-        p90_mean_rv = NA_real_,
-        mean_mean_rv = NA_real_,
-        n_stocks = 0L
-      ))
-    }
-    
-    return(data.frame(
-      interval_minutes = interval_minutes,
-      median_mean_rv = median(rv_values),
-      p10_mean_rv = as.numeric(quantile(rv_values, 0.10, names = FALSE)),
-      p25_mean_rv = as.numeric(quantile(rv_values, 0.25, names = FALSE)),
-      p75_mean_rv = as.numeric(quantile(rv_values, 0.75, names = FALSE)),
-      p90_mean_rv = as.numeric(quantile(rv_values, 0.90, names = FALSE)),
-      mean_mean_rv = mean(rv_values),
-      n_stocks = length(rv_values)
-    ))
-  })
-  
-  signature_aggregate <- do.call(rbind, aggregate_list)
-  rownames(signature_aggregate) <- NULL
-  
-  return(signature_aggregate)
 }
