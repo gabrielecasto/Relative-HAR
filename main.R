@@ -133,10 +133,20 @@ STOCK_TICKERS_SIGNATURE <- intersect(
   colnames(DT)
 )
 
+future::plan(future::multisession,
+             workers = max(parallel::detectCores() - 1, 1))
+
+progressr::handlers(global = TRUE)
+progressr::handlers("txtprogressbar")
+
+cat("Workers before signature:", future::nbrOfWorkers(), "\n")
+
+options(future.globals.maxSize = 8 * 1024^3)
+
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   DT = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
-  intervals = 1:150,
+  intervals = 1:50,
   date_col_name = "datetime",
   include_partial_last_block = TRUE,
   minimum_days_required = 1,

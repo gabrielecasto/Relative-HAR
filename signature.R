@@ -170,11 +170,13 @@ BuildVolatilitySignature <- function(DT,
                                      show_progress = TRUE) {
   
   DT <- as.data.frame(DT)
+  date_col_name <- as.character(date_col_name)[1]
   
   if (missing(tickers) || is.null(tickers)) {
     tickers <- setdiff(names(DT), c("datetime", "date", "m"))
   }
   
+  tickers <- as.character(unlist(tickers, use.names = FALSE))
   tickers <- tickers[tickers %in% names(DT)]
   
   if (length(tickers) == 0) {
@@ -182,32 +184,44 @@ BuildVolatilitySignature <- function(DT,
   }
   
   if (show_progress) {
-    pb <- txtProgressBar(min = 0, max = length(tickers), style = 3)
-    on.exit(close(pb), add = TRUE)
-  }
-  
-  signature_list <- vector("list", length(tickers))
-  
-  for (i in seq_along(tickers)) {
     
-    ticker <- tickers[i]
+    signature_list <- progressr::with_progress({
+      
+      p <- progressr::progressor(steps = length(tickers))
+      
+      future.apply::future_lapply(tickers, function(ticker) {
+        
+        out <- ComputeSignatureForTicker(
+          DT = DT,
+          ticker = ticker,
+          intervals = intervals,
+          include_partial_last_block = include_partial_last_block,
+          minimum_days_required = minimum_days_required,
+          date_col_name = date_col_name
+        )
+        
+        p(sprintf("ticker %s", ticker))
+        
+        return(out)
+      })
+    })
     
-    signature_list[[i]] <- ComputeSignatureForTicker(
-      DT = DT,
-      ticker = ticker,
-      intervals = intervals,
-      include_partial_last_block = include_partial_last_block,
-      minimum_days_required = minimum_days_required,
-      date_col_name = date_col_name
-    )
+  } else {
     
-    if (show_progress) {
-      setTxtProgressBar(pb, i)
-    }
+    signature_list <- future.apply::future_lapply(tickers, function(ticker) {
+      
+      ComputeSignatureForTicker(
+        DT = DT,
+        ticker = ticker,
+        intervals = intervals,
+        include_partial_last_block = include_partial_last_block,
+        minimum_days_required = minimum_days_required,
+        date_col_name = date_col_name
+      )
+    })
   }
   
   signature_by_stock <- do.call(rbind, signature_list)
-  
   rownames(signature_by_stock) <- NULL
   
   return(signature_by_stock)
