@@ -153,7 +153,7 @@ options(future.globals.maxSize = 8 * 1024^3)
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   DT = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
-  intervals = 1:30,
+  intervals = 1:50,
   date_col_name = "datetime",
   include_partial_last_block = TRUE,
   minimum_days_required = 1,
@@ -166,9 +166,9 @@ SIGNATURE_AGGREGATE <- AggregateVolatilitySignature(
 
 SIGNATURE_AGGREGATE <- SIGNATURE_AGGREGATE %>%
   dplyr::mutate(
-    median_ann_vol_pct = sqrt(median_mean_rv * 252) * 100,
-    p25_ann_vol_pct = sqrt(p25_mean_rv * 252) * 100,
-    p75_ann_vol_pct = sqrt(p75_mean_rv * 252) * 100
+    median_mean_rv_ann_pct2 = median_mean_rv * 252 * 100^2,
+    p25_mean_rv_ann_pct2 = p25_mean_rv * 252 * 100^2,
+    p75_mean_rv_ann_pct2 = p75_mean_rv * 252 * 100^2
   )
 
 signature_plot <- ggplot2::ggplot(
@@ -177,14 +177,14 @@ signature_plot <- ggplot2::ggplot(
 ) +
   ggplot2::geom_ribbon(
     ggplot2::aes(
-      ymin = p25_mean_rv,
-      ymax = p75_mean_rv
+      ymin = p25_mean_rv_ann_pct2,
+      ymax = p75_mean_rv_ann_pct2
     ),
     fill = "grey80",
     alpha = 0.7
   ) +
   ggplot2::geom_line(
-    ggplot2::aes(y = median_mean_rv),
+    ggplot2::aes(y = median_mean_rv_ann_pct2),
     color = "red",
     linewidth = 1
   ) +
