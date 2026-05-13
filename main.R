@@ -20,7 +20,8 @@ sources <- c(
   "cleaning.R",
   "sectors.R",
   "analysis.R",
-  "signature.R"
+  "signature.R",
+  "signature_plots.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -159,3 +160,4 @@ SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   minimum_days_required = 1,
   show_progress = TRUE
 )
+
