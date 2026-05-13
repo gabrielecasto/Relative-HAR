@@ -141,8 +141,6 @@ FilterB <- function(Minutes_Big_Gap, Maximum_N_Big_Gaps, Max_Gap_Allowed) {
   X <- as.matrix(PRICES[, ..ticker_cols_A])
   OBS <- !is.na(X)
   
-  future::plan(future::sequential)
-  
   # Compute ticker-level gap stats
   gap_rows <- lapply(seq_along(ticker_cols_A), function(j) {
     o <- OBS[, j]

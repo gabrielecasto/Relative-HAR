@@ -1,7 +1,5 @@
 
-# In this section we will install the required packages, set the
-# parallel plan and progress bar
-
+# In this section we will install the required packages and set the progress bar
 
 
 
@@ -16,13 +14,6 @@ to_install <- packages[!(packages %in% installed.packages()[, "Package"])]
 if (length(to_install) > 0) install.packages(to_install)
 
 invisible(lapply(packages, library, character.only = TRUE))
-
-
-
-#___________________________DEFINE_PARALLEL_PLAN________________________________
-
-future::plan(future::multisession,
-             workers = max(parallel::detectCores() - 1, 1))
 
 
 

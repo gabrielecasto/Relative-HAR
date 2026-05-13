@@ -56,6 +56,11 @@ TICKER_SECTOR_TABLE <- AddSectorEtf(ticker_sector_table = TICKER_SECTOR_TABLE,
 # Find ETFs to download
 ETFS <- unique(stats::na.omit(TICKER_SECTOR_TABLE$sector_etf))
 
+# Set parallel plan for import
+future::plan(future::multisession, workers =
+               max(parallel::detectCores() - 1, 1))
+cat("Workers before import:", future::nbrOfWorkers(), "\n")
+
 # Import minute level data for SP500 tickers, SPY and sector ETFs
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   tickers = c(STOCK_TICKERS, "SPY", ETFS),
@@ -68,7 +73,10 @@ INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   NA_Share_Threshold = 0.9
 )
 
-
+# Reset parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers before cleaning:", future::nbrOfWorkers(), "\n")
 
 #______________________________CLEANING_DATA____________________________________
 
@@ -128,18 +136,21 @@ suppressWarnings(setdiff(ETFS, colnames(DT)))
 
 #_______________________________SIGNATURE_PLOT__________________________________
 
+
+
+# Set parallel plan for signature plot
+future::plan(future::multisession, workers = 
+               max(parallel::detectCores() - 1, 1))
+cat("Workers before signature:", future::nbrOfWorkers(), "\n")
+
+
 STOCK_TICKERS_SIGNATURE <- intersect(
   as.character(unlist(STOCK_TICKERS, use.names = FALSE)),
   colnames(DT)
 )
 
-future::plan(future::multisession,
-             workers = max(parallel::detectCores() - 1, 1))
-
 progressr::handlers(global = TRUE)
 progressr::handlers("txtprogressbar")
-
-cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 
 options(future.globals.maxSize = 8 * 1024^3)
 
