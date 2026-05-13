@@ -164,6 +164,13 @@ SIGNATURE_AGGREGATE <- AggregateVolatilitySignature(
   signature_by_stock = SIGNATURE_BY_STOCK
 )
 
+SIGNATURE_AGGREGATE <- SIGNATURE_AGGREGATE %>%
+  dplyr::mutate(
+    median_ann_vol_pct = sqrt(median_mean_rv * 252) * 100,
+    p25_ann_vol_pct = sqrt(p25_mean_rv * 252) * 100,
+    p75_ann_vol_pct = sqrt(p75_mean_rv * 252) * 100
+  )
+
 signature_plot <- ggplot2::ggplot(
   SIGNATURE_AGGREGATE,
   ggplot2::aes(x = interval_minutes)
