@@ -146,9 +146,9 @@ options(future.globals.maxSize = 8 * 1024^3)
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   DT = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
-  intervals = 1:50,
+  intervals = 1:40,
   date_col_name = "datetime",
-  include_partial_last_block = TRUE,
+  include_partial_last_block = FALSE,
   minimum_days_required = 1,
   show_progress = TRUE
 )
