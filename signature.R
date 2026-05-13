@@ -1,11 +1,14 @@
 
 
 
-# In this section we build the functions to ...
+# In this section we compute the volatility signature for each selected stock.
+# Starting from one-minute intraday log returns, we aggregate returns over
+# different time intervals, compute daily realized variance for each interval,
+# and then summarize the average realized variance across trading days.
 
 
 
-#_______________________________SIGNATURE_PLOT__________________________________
+#____________________________VOLATILITY_SIGNATURE_______________________________
 
 # This function converts one-minute intraday log returns into
 # interval-level log returns.
@@ -199,3 +202,7 @@ BuildVolatilitySignature <- function(DF, tickers, intervals, date_col_name,
   
   return(signature_by_stock)
 }
+
+
+
+#_____________________________END_OF_THE_SCRIPT_________________________________

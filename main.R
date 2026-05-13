@@ -79,6 +79,8 @@ future::plan(future::sequential)
 invisible(gc())
 cat("Workers before cleaning:", future::nbrOfWorkers(), "\n")
 
+
+
 #______________________________CLEANING_DATA____________________________________
 
 # In this section we clean the data. Start by building a master grid composed of
@@ -135,22 +137,22 @@ suppressWarnings(setdiff(ETFS, colnames(DT)))
 
 
 
-#_______________________________SIGNATURE_PLOT__________________________________
-
-
+#____________________________VOLATILITY_SIGNATURE_______________________________
 
 # Set parallel plan for signature plot
 future::plan(future::multisession, workers = 4)
 cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 
-
+# Stocks selected to perform signature
 STOCK_TICKERS_SIGNATURE <- intersect(
   as.character(unlist(STOCK_TICKERS, use.names = FALSE)),
   colnames(DT)
 )
 
+# Option for parallel work
 options(future.globals.maxSize = 8 * 1024^3)
 
+# Signature statistics for each stock
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   DF = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
@@ -160,4 +162,110 @@ SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   minimum_days_required = 1,
   show_progress = TRUE
 )
+
+
+
+#_____________________________SIGNATURE_PLOTS___________________________________
+
+
+SIGNATURE_PLOT_DF <- PrepareSignaturePlotData(
+  signature_by_stock = SIGNATURE_BY_STOCK,
+  ticker_sector_table = TICKER_SECTOR_TABLE,
+  plateau_intervals = 10:30,
+  noise_intervals = 1:2,
+  reference_interval = 10,
+  minimum_days_required = 50,
+  drop_invalid_plateau = TRUE
+)
+
+SIGNATURE_INTERVAL_SUMMARY <- BuildSignatureIntervalSummary(
+  signature_plot_df = SIGNATURE_PLOT_DF,
+  ratio_col = "rv_ratio"
+)
+
+SIGNATURE_SECTOR_SUMMARY <- BuildSignatureSectorSummary(
+  signature_plot_df = SIGNATURE_PLOT_DF,
+  sector_col = "sector",
+  ratio_col = "rv_ratio",
+  minimum_stocks_per_sector = 10,
+  drop_missing_sector = TRUE
+)
+
+
+SIGNATURE_DECISION_TABLE <- BuildSignatureDecisionTable(
+  signature_plot_df = SIGNATURE_PLOT_DF,
+  ratio_col = "rv_ratio"
+)
+
+print(SIGNATURE_DECISION_TABLE)
+
+
+P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
+  signature_plot_df = SIGNATURE_PLOT_DF,
+  signature_interval_summary = SIGNATURE_INTERVAL_SUMMARY,
+  ratio_col = "rv_ratio",
+  lower_band_col = "p10_ratio",
+  upper_band_col = "p90_ratio",
+  median_col = "median_ratio",
+  reference_interval = 10,
+  y_limits = NULL,
+  output_path = "figures/signature_spaghetti.pdf"
+)
+
+print(P_SIGNATURE_SPAGHETTI)
+
+P_SIGNATURE_HEATMAP <- PlotSignatureHeatmap(
+  signature_plot_df = SIGNATURE_PLOT_DF,
+  fill_col = "log_rv_ratio",
+  order_col = "noise_ratio",
+  reference_interval = 10,
+  cap_quantile = 0.98,
+  show_ticker_labels = FALSE,
+  output_path = "figures/signature_heatmap.pdf"
+)
+
+print(P_SIGNATURE_HEATMAP)
+
+
+P_SIGNATURE_SECTOR <- PlotSignatureBySector(
+  signature_sector_summary = SIGNATURE_SECTOR_SUMMARY,
+  sector_col = "sector",
+  lower_band_col = "p25_ratio",
+  upper_band_col = "p75_ratio",
+  median_col = "median_ratio",
+  reference_interval = 10,
+  y_limits = NULL,
+  facet_ncol = 3,
+  output_path = "figures/signature_by_sector.pdf"
+)
+
+print(P_SIGNATURE_SECTOR)
+
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
