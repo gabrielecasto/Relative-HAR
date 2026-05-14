@@ -192,7 +192,7 @@ BuildWideIntradayDf <- function(tickers, from_date, to_date, multiplier = 1,
     
     
 #____________________________PATCH_BAD_TICKER_DAYS______________________________
-  
+
 # In this section we patch extreme missingness that can arise from intermittent
 # API failures in large parallel downloads. We identify (date, ticker) pairs
 # where a ticker is almost entirely missing for that day, and we re-download
@@ -200,105 +200,109 @@ BuildWideIntradayDf <- function(tickers, from_date, to_date, multiplier = 1,
 # storage-efficient because we never rebuild a large long table and we patch
 # only a small number of problematic pairs.
     
-if (Patch_Bad_Days) {
-  
-  data.table::setDT(df_wide_month)
-  df_wide_month[, date := as.Date(datetime)]
-  
-  ticker_cols <- setdiff(names(df_wide_month), c("datetime", "date"))
-  unique_days <- unique(df_wide_month$date)
-  
-  # Collect bad (date, ticker) pairs without reshaping the whole dataset to long
-  bad_pairs <- vector("list", length(unique_days))
-  k <- 1L
+    if (Patch_Bad_Days) {
       
-  for (d0 in unique_days) {
-    rows_d <- df_wide_month$date == d0
-    
-    # Compute NA share per ticker for this day (small slice: ~390 rows)
-    na_share <- colMeans(is.na(as.data.frame(df_wide_month[rows_d,
-                                                           ..ticker_cols])))
-    
-    bad_tickers <- names(na_share)[na_share >= NA_Share_Threshold]
-    
-    if (length(bad_tickers) > 0) {
-      bad_pairs[[k]] <- data.table::data.table(date = d0, ticker = bad_tickers)
-      k <- k + 1L
-    }
-}
+      data.table::setDT(df_wide_month)
+      df_wide_month[, date := as.Date(datetime)]
       
-    bad_pairs <- data.table::rbindlist(bad_pairs, use.names = TRUE)
+      ticker_cols <- setdiff(names(df_wide_month), c("datetime", "date"))
+      unique_days <- unique(df_wide_month$date)
       
-    if (!is.null(bad_pairs) && nrow(bad_pairs) > 0) {
+      # Collect bad (date, ticker) pairs without reshaping the whole dataset to long
+      bad_pairs <- vector("list", length(unique_days))
+      k <- 1L
       
-      # Cap the number of patches to avoid runaway API usage
-      if (nrow(bad_pairs) > Max_Patches_Per_Quarter) {
-      bad_pairs <- bad_pairs[1:Max_Patches_Per_Quarter]
-        if (verbose) message("Patch cap reached: patching only first ", Max_Patches_Per_Quarter, " pairs.")
+      for (d0 in unique_days) {
+        rows_d <- df_wide_month$date == d0
+        
+        # Compute NA share per ticker for this day (small slice: ~390 rows)
+        na_share <- colMeans(is.na(as.data.frame(df_wide_month[rows_d,
+                                                               ..ticker_cols])))
+        
+        bad_tickers <- names(na_share)[na_share >= NA_Share_Threshold]
+        
+        if (length(bad_tickers) > 0) {
+          bad_pairs[[k]] <- data.table::data.table(date = d0, ticker = 
+                                                     bad_tickers)
+          k <- k + 1L
+        }
       }
       
-      if (verbose) message("Patching ", nrow(bad_pairs), " (date, ticker) pairs with NA-share >= ", NA_Share_Threshold, " ...")
+      bad_pairs <- data.table::rbindlist(bad_pairs, use.names = TRUE)
       
-      # Patch sequentially to reduce RAM pressure and avoid API rate spikes
-      for (i in seq_len(nrow(bad_pairs))) {
-        d1 <- bad_pairs$date[i]
-        sym <- bad_pairs$ticker[i]
+      if (!is.null(bad_pairs) && nrow(bad_pairs) > 0) {
         
-        Sys.sleep(Patch_Sleep_Sec)
+        # Cap the number of patches to avoid runaway API usage
+        if (nrow(bad_pairs) > Max_Patches_Per_Quarter) {
+          bad_pairs <- bad_pairs[1:Max_Patches_Per_Quarter]
+          if (verbose) message("Patch cap reached: patching only first ", 
+                               Max_Patches_Per_Quarter, " pairs.")
+        }
         
-        df_day <- try(
-          GetIntradayRange(
-            ticker = sym,
-            from_date = d1,
-            to_date = d1,
-            multiplier = multiplier,
-            timespan = timespan,
-            api_key = api_key,
-            verbose = FALSE
-          ),
-          silent = TRUE
-        )
+        if (verbose) message("Patching ", nrow(bad_pairs), 
+                             " (date, ticker) pairs with NA-share >= ", 
+                             NA_Share_Threshold, " ...")
         
-        if (inherits(df_day, "try-error") || nrow(df_day) == 0) next
-        
-        # Keep only trading minutes and align to the wide timestamps
-        data.table::setDT(df_day)
-        df_day <- df_day[, .(datetime, close)]
-        data.table::setkey(df_day, datetime)
-        
-        idx_day <- which(df_wide_month$date == d1)
-        if (length(idx_day) == 0) next
-        
-        dt_slice <- df_wide_month[idx_day, .(datetime)]
-        data.table::setkey(dt_slice, datetime)
-        
-        # Join on datetime and overwrite the ticker column for this day
-        dt_slice[df_day, value := i.close]
-        df_wide_month[idx_day, (sym) := dt_slice$value]
-        
-        rm(df_day, dt_slice, idx_day); invisible(gc())
+        # Patch sequentially to reduce RAM pressure and avoid API rate spikes
+        for (i in seq_len(nrow(bad_pairs))) {
+          d1 <- bad_pairs$date[i]
+          sym <- bad_pairs$ticker[i]
+          
+          Sys.sleep(Patch_Sleep_Sec)
+          
+          df_day <- try(
+            GetIntradayRange(
+              ticker = sym,
+              from_date = d1,
+              to_date = d1,
+              multiplier = multiplier,
+              timespan = timespan,
+              api_key = api_key,
+              verbose = FALSE
+            ),
+            silent = TRUE
+          )
+          
+          if (inherits(df_day, "try-error") || nrow(df_day) == 0) next
+          
+          # Keep only trading minutes and align to the wide timestamps
+          data.table::setDT(df_day)
+          df_day <- df_day[, .(datetime, close)]
+          data.table::setkey(df_day, datetime)
+          
+          idx_day <- which(df_wide_month$date == d1)
+          if (length(idx_day) == 0) next
+          
+          dt_slice <- df_wide_month[idx_day, .(datetime)]
+          data.table::setkey(dt_slice, datetime)
+          
+          # Join on datetime and overwrite the ticker column for this day
+          dt_slice[df_day, value := i.close]
+          df_wide_month[idx_day, (sym) := dt_slice$value]
+          
+          rm(df_day, dt_slice, idx_day); invisible(gc())
+        }
       }
-    }
       
-    # Remove helper column
-    df_wide_month[, date := NULL]
+      # Remove helper column
+      df_wide_month[, date := NULL]
+    }
+    
+    
+    rm(df_long_month)
+    
+    wide_month_list[[m]] <- df_wide_month
+    rm(df_wide_month)
   }
   
+  # Combine months (faster + less copying)
+  out <- data.table::rbindlist(purrr::compact(wide_month_list), fill = TRUE)
   
-  rm(df_long_month)
+  # Deduplicate & sort
+  out <- unique(out, by = "datetime")
+  data.table::setorder(out, datetime)
   
-  wide_month_list[[m]] <- df_wide_month
-  rm(df_wide_month)
-}
-  
-# Combine months (faster + less copying)
-out <- data.table::rbindlist(purrr::compact(wide_month_list), fill = TRUE)
-
-# Deduplicate & sort
-out <- unique(out, by = "datetime")
-data.table::setorder(out, datetime)
-
-return(out)
+  return(out)
 }
 
 

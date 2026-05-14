@@ -1,4 +1,3 @@
-
 # In this section we can run the whole script, using functions from other
 # files in the same working directory
 
@@ -23,7 +22,7 @@ sources <- c(
   "signature_plots.R",
   "HAR.R",
   "relative_HAR.R",
-  "model_comparison_plot.R"
+  "model_comparison_plots.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -67,8 +66,8 @@ cat("Workers before import:", future::nbrOfWorkers(), "\n")
 # Import minute level data for SP500 tickers, SPY and sector ETFs
 INTRADAY_WIDE_DF <- BuildWideIntradayDf(
   tickers = c(STOCK_TICKERS, "SPY", ETFS),
-  from_date = as.Date("2022-01-01"),
-  to_date = as.Date("2023-01-31"),
+  from_date = as.Date("2019-01-01"),
+  to_date = as.Date("2022-12-31"),
   multiplier = 1,
   timespan = "minute",
   sleep_sec = 0.3,
@@ -323,11 +322,21 @@ RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
 
 #___________________________MODEL_COMPARISON_PLOTS______________________________
 
+# In this section we compare the forecasting performance of the standard HAR
+# model and the relative HAR model. Forecasts are matched by ticker and target
+# date, then percentage errors are computed on the log realized variance scale.
+# The script produces sector-level time-series plots, overlapping error
+# histograms, and a summary table comparing mean, median and tail forecast
+# errors across models.
+
+# Build a panel that allows for a graphical and numerical model comparison
 MODEL_COMPARISON <- BuildModelComparisonPanel(
   har_forecast_errors = HAR_FORECAST_ERRORS,
   relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS
 )
 
+# Plot the percentage out of sample estimation errors for HAR and relative_HAR
+# over time, by sector
 P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR <-
   PlotPercentageErrorsOverTimeBySector(model_comparison = MODEL_COMPARISON,
   facet_ncol = 3,
@@ -336,6 +345,8 @@ P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR <-
 
 print(P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR)
 
+# Plot the distribution of the percentage out of sample estimation errors
+# for HAR and relative_HAR by sector
 P_PERCENTAGE_ERROR_HISTOGRAMS_BY_SECTOR <- 
   PlotPercentageErrorHistogramsBySector(model_comparison = MODEL_COMPARISON,
   bins = 45,
