@@ -297,9 +297,14 @@ HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
 
 
 
+#_______________________________RELATIVE_HAR____________________________________
 
-
-
+RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
+  daily_log_rv_wide = DAILY_RV_10MIN,
+  ticker_sector_table = TICKER_SECTOR_TABLE,
+  market_ticker = "SPY",
+  date_col_name = "date"
+)
 
 
 
