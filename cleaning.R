@@ -75,8 +75,6 @@ FilterA <- function(Coverage_Threshold) {
   
   PRICES <- INTRADAY_WIDE_DF[MASTER_GRID]
   
-  rm(INTRADAY_WIDE_DF, envir = .GlobalEnv); gc()
-  
   stopifnot(nrow(PRICES) == nrow(MASTER_GRID))
   stopifnot(identical(PRICES$datetime, MASTER_GRID$datetime))
   
