@@ -558,28 +558,36 @@ RollingRelativeHARForecastPanel <- function(daily_log_rv_wide,
   rownames(relative_har_tickers) <- NULL
   
   # Estimate rolling relative HAR forecasts separately for each ticker
-  forecast_list <- future.apply::future_lapply(
-    seq_len(nrow(relative_har_tickers)),
-    function(row_index) {
-      
-      ticker_info <- relative_har_tickers[row_index, ]
-      
-      forecast_errors <- RollingRelativeHARForecastByTicker(
-        daily_log_rv_wide = daily_log_rv_wide,
-        ticker = ticker_info$ticker,
-        sector = ticker_info$sector,
-        sector_etf = ticker_info$sector_etf,
-        market_ticker = market_ticker,
-        training_window = training_window,
-        first_lag = first_lag,
-        second_lag = second_lag,
-        third_lag = third_lag,
-        minimum_observations = minimum_observations
-      )
-      
-      return(forecast_errors)
-    }
-  )
+  # Progress is shown by default using progressr, as defined in setup.R.
+  forecast_list <- progressr::with_progress({
+    
+    p <- progressr::progressor(steps = nrow(relative_har_tickers))
+    
+    future.apply::future_lapply(
+      seq_len(nrow(relative_har_tickers)),
+      function(row_index) {
+        
+        ticker_info <- relative_har_tickers[row_index, ]
+        
+        forecast_errors <- RollingRelativeHARForecastByTicker(
+          daily_log_rv_wide = daily_log_rv_wide,
+          ticker = ticker_info$ticker,
+          sector = ticker_info$sector,
+          sector_etf = ticker_info$sector_etf,
+          market_ticker = market_ticker,
+          training_window = training_window,
+          first_lag = first_lag,
+          second_lag = second_lag,
+          third_lag = third_lag,
+          minimum_observations = minimum_observations
+        )
+        
+        p(sprintf("ticker %s", ticker_info$ticker))
+        
+        return(forecast_errors)
+      }
+    )
+  })
   
   # Remove skipped tickers
   forecast_list <- forecast_list[!sapply(forecast_list, is.null)]
