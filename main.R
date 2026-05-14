@@ -251,13 +251,18 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 rm(P_SIGNATURE_HEATMAP, P_SIGNATURE_SECTOR, P_SIGNATURE_SPAGHETTI,
    SIGNATURE_AGGREGATE, SIGNATURE_SECTOR_SUMMARY, signature_plot,
-   SIGNATURE_PLOT_DF)
+   SIGNATURE_PLOT_DF, SIGNATURE_BY_STOCK, SIGNATURE_DECISION_TABLE,
+   SIGNATURE_INTERVAL_SUMMARY)
 invisible(gc())
 
 
 
 #____________________________________HAR________________________________________
 
+
+# Set parallel plan for signature plot
+future::plan(future::multisession, workers = 4)
+cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 
 STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
                        unique(TICKER_SECTOR_TABLE$sector_etf))
@@ -271,7 +276,14 @@ DAILY_RV_10MIN <- BuildDailyRVPanel(
   minimum_blocks_required = 1
 )
 
-
+HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
+  daily_log_rv_wide = DAILY_RV_10MIN,
+  tickers = STOCK_TICKERS_HAR,
+  training_window = 100,
+  first_lag = 1,
+  second_lag = 5,
+  third_lag = 22
+)
 
 
 
