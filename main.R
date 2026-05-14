@@ -317,12 +317,3 @@ RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   third_lag = 22,
   minimum_observations = 30
 )
-
-
-
-
-
-
-
-
-
