@@ -21,7 +21,8 @@ sources <- c(
   "sectors.R",
   "signature.R",
   "signature_plots.R",
-  "HAR.R"
+  "HAR.R",
+  "relative_HAR.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -267,7 +268,7 @@ invisible(gc())
 # forecast errors. Lags to determine the three regressors are 1,5,22 by default
 # but can be modified.
 
-# Set parallel plan for signature plot
+# Set parallel plan for HAR model
 future::plan(future::multisession, workers = 4)
 cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 
@@ -306,7 +307,16 @@ RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
   date_col_name = "date"
 )
 
-
+RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
+  daily_log_rv_wide = DAILY_RV_10MIN,
+  relative_har_tickers = RELATIVE_HAR_TICKERS,
+  training_window = 200,
+  market_ticker = "SPY",
+  first_lag = 1,
+  second_lag = 5,
+  third_lag = 22,
+  minimum_observations = 30
+)
 
 
 
