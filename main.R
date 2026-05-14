@@ -59,21 +59,50 @@ TICKER_SECTOR_TABLE <- AddSectorEtf(ticker_sector_table = TICKER_SECTOR_TABLE,
 ETFS <- unique(stats::na.omit(TICKER_SECTOR_TABLE$sector_etf))
 
 # Set parallel plan for import
-future::plan(future::multisession, workers =
-               max(parallel::detectCores() - 1, 1))
+future::plan(future::multisession, workers=max(parallel::detectCores() - 1, 1))
 cat("Workers before import:", future::nbrOfWorkers(), "\n")
 
-# Import minute level data for SP500 tickers, SPY and sector ETFs
-INTRADAY_WIDE_DF <- BuildWideIntradayDf(
-  tickers = c(STOCK_TICKERS, "SPY", ETFS),
-  from_date = as.Date("2019-01-01"),
-  to_date = as.Date("2022-12-31"),
-  multiplier = 1,
-  timespan = "minute",
-  sleep_sec = 0.3,
-  verbose = TRUE,
-  NA_Share_Threshold = 0.9
-)
+# Import minute level data for SP500 tickers, SPY and sector ETFs by importing
+# individual years and binding rows
+IMPORT_YEARS <- 2019:2022
+
+INTRADAY_YEAR_LIST <- vector("list", length(IMPORT_YEARS))
+names(INTRADAY_YEAR_LIST) <- as.character(IMPORT_YEARS)
+
+for (year in IMPORT_YEARS) {
+  
+  message("\n==============================")
+  message("Importing year: ", year)
+  message("==============================\n")
+  
+  from_year <- as.Date(paste0(year, "-01-01"))
+  to_year <- as.Date(paste0(year, "-12-31"))
+  
+  INTRADAY_YEAR_LIST[[as.character(year)]] <- BuildWideIntradayDf(
+    tickers = c(STOCK_TICKERS, "SPY", ETFS),
+    from_date = from_year,
+    to_date = to_year,
+    multiplier = 1,
+    timespan = "minute",
+    sleep_sec = 0.3,
+    verbose = TRUE,
+    NA_Share_Threshold = 0.9
+  )
+  
+  invisible(gc())
+}
+
+# Combine all yearly datasets into one full intraday panel
+INTRADAY_WIDE_DF <- data.table::rbindlist(INTRADAY_YEAR_LIST, fill = TRUE)
+
+# Deduplicate and sort by datetime
+INTRADAY_WIDE_DF <- unique(INTRADAY_WIDE_DF, by = "datetime")
+data.table::setorder(INTRADAY_WIDE_DF, datetime)
+
+# Clean temporary objects
+rm(INTRADAY_YEAR_LIST, IMPORT_YEARS,
+   from_year, to_year, year)
+invisible(gc())
 
 # Reset parallel plan
 future::plan(future::sequential)
@@ -290,7 +319,7 @@ DAILY_RV_10MIN <- BuildDailyRVPanel(
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_10MIN,
   tickers = STOCK_TICKERS_HAR,
-  training_window = 100,
+  training_window = 500,
   first_lag = 1,
   second_lag = 5,
   third_lag = 22
@@ -299,6 +328,10 @@ HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
 
 
 #_______________________________RELATIVE_HAR____________________________________
+
+# Set parallel plan for relative HAR model
+future::plan(future::multisession, workers=4)
+cat("Workers before import:", future::nbrOfWorkers(), "\n")
 
 RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
   daily_log_rv_wide = DAILY_RV_10MIN,
@@ -310,7 +343,7 @@ RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_10MIN,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
-  training_window = 100,
+  training_window = 500,
   market_ticker = "SPY",
   first_lag = 1,
   second_lag = 5,
