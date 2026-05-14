@@ -22,7 +22,8 @@ sources <- c(
   "signature.R",
   "signature_plots.R",
   "HAR.R",
-  "relative_HAR.R"
+  "relative_HAR.R",
+  "model_comparison_plot.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -290,7 +291,7 @@ DAILY_RV_10MIN <- BuildDailyRVPanel(
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_10MIN,
   tickers = STOCK_TICKERS_HAR,
-  training_window = 200,
+  training_window = 100,
   first_lag = 1,
   second_lag = 5,
   third_lag = 22
@@ -310,10 +311,50 @@ RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_10MIN,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
-  training_window = 200,
+  training_window = 100,
   market_ticker = "SPY",
   first_lag = 1,
   second_lag = 5,
   third_lag = 22,
   minimum_observations = 30
 )
+
+
+
+#___________________________MODEL_COMPARISON_PLOTS______________________________
+
+MODEL_COMPARISON <- BuildModelComparisonPanel(
+  har_forecast_errors = HAR_FORECAST_ERRORS,
+  relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS
+)
+
+P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR <-
+  PlotPercentageErrorsOverTimeBySector(model_comparison = MODEL_COMPARISON,
+  facet_ncol = 3,
+  output_path = "figures/percentage_errors_over_time_by_sector.pdf"
+)
+
+print(P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR)
+
+P_PERCENTAGE_ERROR_HISTOGRAMS_BY_SECTOR <- 
+  PlotPercentageErrorHistogramsBySector(model_comparison = MODEL_COMPARISON,
+  bins = 45,
+  cap_quantile = 0.99,
+  facet_ncol = 3,
+  output_path = "figures/percentage_error_histograms_by_sector.pdf"
+)
+
+print(P_PERCENTAGE_ERROR_HISTOGRAMS_BY_SECTOR)
+
+
+
+
+
+
+
+
+
+
+
+
+
