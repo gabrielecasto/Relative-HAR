@@ -1,6 +1,12 @@
+
+
+
 # In this section we compare the forecasting performance of the standard HAR
 # model and the relative HAR model. Forecasts are matched by ticker and target
 # date, then percentage errors are computed on the log realized variance scale.
+# The script produces sector-level time-series plots, overlapping error
+# histograms, and a summary table comparing mean, median and tail forecast
+# errors across models.
 
 
 
@@ -274,6 +280,70 @@ PlotPercentageErrorHistogramsBySector <- function(model_comparison,
   }
   
   return(p)
+}
+
+
+
+#___________________________SECTOR_ERROR_SUMMARY________________________________
+
+# This function builds a sector-level summary table comparing percentage
+# forecast errors between the standard HAR and relative HAR models.
+
+BuildSectorErrorSummary <- function(model_comparison) {
+  
+  summary_long <- model_comparison$long %>%
+    dplyr::filter(
+      is.finite(percentage_error),
+      !is.na(sector),
+      model %in% c("HAR", "Relative HAR")
+    ) %>%
+    dplyr::group_by(sector, model) %>%
+    dplyr::summarise(
+      mean_error = mean(percentage_error, na.rm = TRUE),
+      median_error = stats::median(percentage_error, na.rm = TRUE),
+      p90_error = stats::quantile(percentage_error, 0.90, na.rm = TRUE),
+      n_obs = dplyr::n(),
+      n_tickers = dplyr::n_distinct(ticker),
+      .groups = "drop"
+    )
+  
+  summary_wide <- summary_long %>%
+    tidyr::pivot_wider(
+      names_from = model,
+      values_from = c(mean_error, median_error, p90_error, n_obs, n_tickers)
+    ) %>%
+    dplyr::mutate(
+      mean_difference =
+        `mean_error_Relative HAR` - mean_error_HAR,
+      median_difference =
+        `median_error_Relative HAR` - median_error_HAR,
+      p90_difference =
+        `p90_error_Relative HAR` - p90_error_HAR,
+      mean_improvement_pct =
+        100 * (1 - `mean_error_Relative HAR` / mean_error_HAR),
+      median_improvement_pct =
+        100 * (1 - `median_error_Relative HAR` / median_error_HAR),
+      p90_improvement_pct =
+        100 * (1 - `p90_error_Relative HAR` / p90_error_HAR)
+    ) %>%
+    dplyr::select(
+      sector,
+      mean_error_HAR,
+      `mean_error_Relative HAR`,
+      mean_difference,
+      mean_improvement_pct,
+      median_error_HAR,
+      `median_error_Relative HAR`,
+      median_improvement_pct,
+      p90_error_HAR,
+      `p90_error_Relative HAR`,
+      p90_improvement_pct,
+      n_tickers_HAR,
+      n_obs_HAR
+    ) %>%
+    dplyr::arrange(dplyr::desc(mean_improvement_pct))
+  
+  return(summary_wide)
 }
 
 
