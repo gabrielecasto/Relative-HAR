@@ -208,7 +208,8 @@ BuildWideIntradayDf <- function(tickers, from_date, to_date, multiplier = 1,
       ticker_cols <- setdiff(names(df_wide_month), c("datetime", "date"))
       unique_days <- unique(df_wide_month$date)
       
-      # Collect bad (date, ticker) pairs without reshaping the whole dataset to long
+      # Collect bad (date, ticker) pairs without reshaping the whole
+      # dataset to long
       bad_pairs <- vector("list", length(unique_days))
       k <- 1L
       
