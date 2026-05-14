@@ -1,11 +1,17 @@
 
 
 
+# In this section we build and estimate rolling HAR models for realized
+# volatility forecasting. Starting from one-minute intraday log returns, we
+# first construct daily log realized variance series for each stock. Then, we
+# build HAR regressors using daily, weekly and monthly variance components,
+# estimate rolling one-step-ahead HAR forecasts, and store the corresponding
+# forecast errors. Lags to determine the three regressors are 1,5,22 by default
+# but can be modified.
 
 
 
-
-
+#______________________________DAILY_RV_PANEL___________________________________
 
 # This function builds a wide daily log realized volatility dataframe.
 # Starting from one-minute intraday log returns, it aggregates returns over a
@@ -102,8 +108,7 @@ BuildDailyRVPanel <- function(DF, tickers, interval_minutes, date_col_name,
 
 
 
-
-
+#__________________BUILD_HAR_REGRESSORS_DATAFRAME_ONE_TICKER____________________
 
 # This function builds the HAR regression dataframe for one selected ticker.
 # Starting from a wide daily log realized volatility dataframe, it constructs
@@ -137,11 +142,28 @@ BuildHARDataForTicker <- function(daily_log_rv_wide, ticker, first_lag = 1,
   dates <- daily_log_rv_wide$date
   log_rv <- as.numeric(daily_log_rv_wide[[ticker]])
   
+  # Check that lags are valid positive integers
+  lags <- c(first_lag, second_lag, third_lag)
+  
+  if (any(!is.finite(lags)) || any(lags < 1) || any(lags != floor(lags))) {
+    stop("first_lag, second_lag and third_lag must be positive integers.",
+         call. = FALSE)
+  }
+  
+  # Define the maximum lag needed to build all HAR components
+  max_lag <- max(lags)
+  
   # Check that there are enough observations to build the HAR variables
-  if (length(log_rv) < (third_lag + 1)) {
+  if (length(log_rv) < (max_lag + 1)) {
     stop("Not enough observations to build HAR data.",
          call. = FALSE)
   }
+  
+  # Define the valid time indices
+  # The first usable origin is the maximum lag. The last usable origin is the
+  # day before the last observation because the target is one day ahead.
+  first_origin_index <- max_lag
+  last_origin_index <- length(log_rv) - 1
   
   # Define the valid time indices
   # The first usable origin is day third_lag. The last usable origin is the day
@@ -153,7 +175,7 @@ BuildHARDataForTicker <- function(daily_log_rv_wide, ticker, first_lag = 1,
   har_list <- lapply(first_origin_index:last_origin_index,
                      function(time_index) {
     
-    # Build the second component using the current day and the previous
+    # Build the first component using the current day and the previous
     # (first_lag - 1) days
     daily_window <- log_rv[(time_index - (first_lag-1)):time_index]
     
@@ -173,7 +195,7 @@ BuildHARDataForTicker <- function(daily_log_rv_wide, ticker, first_lag = 1,
       weekly_component <- NA_real_
     }
     
-    # Build the weekly component using the current day and the previous
+    # Build the third component using the current day and the previous
     # (third_lag - 1) days
     monthly_window <- log_rv[(time_index - (third_lag-1)):time_index]
     
@@ -217,10 +239,7 @@ BuildHARDataForTicker <- function(daily_log_rv_wide, ticker, first_lag = 1,
 
 
 
-
-
-
-
+#________________________ROLLING_HAR_MODEL_ONE_TICKER___________________________
 
 # This function estimates a rolling HAR model for one selected ticker.
 # Starting from a ticker-level HAR dataframe, it uses a fixed rolling window
@@ -337,6 +356,7 @@ RollingHARForecastByTicker <- function(har_data, training_window = 100) {
 
 
 
+#________________________ROLLING_HAR_MODEL_ALL_TICKERS__________________________
 
 # This function estimates rolling HAR models for all selected tickers.
 # Starting from a wide daily log realized volatility dataframe, it builds the
@@ -406,3 +426,7 @@ RollingHARForecastPanel <- function(daily_log_rv_wide,
   
   return(forecast_errors_panel)
 }
+
+
+
+#_____________________________END_OF_THE_SCRIPT_________________________________

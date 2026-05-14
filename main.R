@@ -259,14 +259,23 @@ invisible(gc())
 
 #____________________________________HAR________________________________________
 
+# In this section we build and estimate rolling HAR models for realized
+# volatility forecasting. Starting from one-minute intraday log returns, we
+# first construct daily log realized variance series for each stock. Then, we
+# build HAR regressors using daily, weekly and monthly variance components,
+# estimate rolling one-step-ahead HAR forecasts, and store the corresponding
+# forecast errors. Lags to determine the three regressors are 1,5,22 by default
+# but can be modified.
 
 # Set parallel plan for signature plot
 future::plan(future::multisession, workers = 4)
 cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 
+# Select tickers for HAR estimation
 STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
                        unique(TICKER_SECTOR_TABLE$sector_etf))
 
+# Build 10-minutes daily Realized Variance panel
 DAILY_RV_10MIN <- BuildDailyRVPanel(
   DF = DT,
   tickers = STOCK_TICKERS_HAR,
@@ -276,10 +285,11 @@ DAILY_RV_10MIN <- BuildDailyRVPanel(
   minimum_blocks_required = 1
 )
 
+# Estimate rolling HAR and report prediction errors out-of-sample (1-step ahead)
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_10MIN,
   tickers = STOCK_TICKERS_HAR,
-  training_window = 100,
+  training_window = 200,
   first_lag = 1,
   second_lag = 5,
   third_lag = 22
