@@ -26,7 +26,7 @@ sources <- c(
   "daily_RV_chechs",
   "HAR.R",
   "relative_HAR.R",
-  "model_comparison_plots.R",
+  "model_comparison_plots.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -356,9 +356,6 @@ if ("DOW" %in% names(DAILY_RV_20MIN)) {
   DAILY_RV_20MIN$DOW <- NULL
 }
 
-# Use the same stock universe for standard HAR and relative HAR
-STOCK_TICKERS_HAR <- RELATIVE_HAR_TICKERS$ticker
-
 # Prepare the relative HAR ticker universe after cleaning the daily RV panel
 RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
   daily_log_rv_wide = DAILY_RV_20MIN,
@@ -366,6 +363,13 @@ RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
   market_ticker = "SPY",
   date_col_name = "date"
 )
+
+# Extra safety: remove DOW from the relative HAR ticker table
+RELATIVE_HAR_TICKERS <- RELATIVE_HAR_TICKERS[
+  RELATIVE_HAR_TICKERS$ticker != "DOW",
+]
+
+rownames(RELATIVE_HAR_TICKERS) <- NULL
 
 # Checks on the cleaned RV to ensure comparability across models
 DAILY_RV_CHECKS <- CheckDailyRVPanelQuality(
@@ -431,16 +435,11 @@ MODEL_COMPARISON <- BuildModelComparisonPanel(
   relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS
 )
 
-# Check comparison sample
-cat("HAR raw rows:", nrow(HAR_FORECAST_ERRORS), "\n")
-cat("Relative HAR raw rows:", nrow(RELATIVE_HAR_FORECAST_ERRORS), "\n")
-cat("Paired comparison rows:", nrow(MODEL_COMPARISON$paired), "\n")
-
-cat("HAR raw tickers:", length(unique(HAR_FORECAST_ERRORS$ticker)), "\n")
-cat("Relative HAR tickers:", 
-    length(unique(RELATIVE_HAR_FORECAST_ERRORS$ticker)), "\n")
-cat("Comparison tickers:", 
-    length(unique(MODEL_COMPARISON$paired$ticker)), "\n")
+MODEL_ALIGNMENT_CHECKS <- CheckHARModelAlignment(
+  har_forecast_errors = HAR_FORECAST_ERRORS,
+  relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS,
+  model_comparison = MODEL_COMPARISON
+)
 
 # Plot the percentage out of sample estimation errors for HAR and relative_HAR
 # over time, by sector
