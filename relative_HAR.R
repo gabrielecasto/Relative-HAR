@@ -101,42 +101,75 @@ FitRelativeDecompositionWindow <- function(window_data, minimum_observations) {
   }
   
   # First regression: remove the market component from sector volatility
-  sector_model <- stats::lm(
-    y_sector ~ y_market,
-    data = model_data
+  y_market <- as.numeric(model_data$y_market)
+  y_sector <- as.numeric(model_data$y_sector)
+  
+  sector_x <- cbind(
+    intercept = 1,
+    y_market = y_market
   )
   
-  # Orthogonal sector component
-  model_data$s_perp <- as.numeric(stats::residuals(sector_model))
-  
-  # Second regression: decompose stock volatility into market, sector and
-  # relative components
-  stock_model <- stats::lm(
-    y_stock ~ y_market + s_perp,
-    data = model_data
+  sector_fit <- tryCatch(
+    stats::lm.fit(
+      x = sector_x,
+      y = y_sector
+    ),
+    error = function(e) NULL
   )
   
-  # Extract fitted systematic component and relative component
-  model_data$y_systematic <- as.numeric(stats::fitted(stock_model))
-  model_data$q <- as.numeric(stats::residuals(stock_model))
-  
-  # Extract decomposition coefficients
-  sector_coefs <- stats::coef(sector_model)
-  stock_coefs <- stats::coef(stock_model)
-  
-  required_stock_coefs <- c("(Intercept)", "y_market", "s_perp")
-  required_sector_coefs <- c("(Intercept)", "y_market")
-  
-  if (!all(required_stock_coefs %in% names(stock_coefs)) ||
-      !all(required_sector_coefs %in% names(sector_coefs))) {
+  if (is.null(sector_fit) || is.null(sector_fit$coefficients)) {
     return(NULL)
   }
   
-  alpha_hat <- unname(stock_coefs["(Intercept)"])
+  sector_coefs <- sector_fit$coefficients
+  names(sector_coefs) <- colnames(sector_x)
+  
+  if (!all(is.finite(sector_coefs))) {
+    return(NULL)
+  }
+  
+  sector_fitted <- as.numeric(sector_x %*% sector_coefs)
+  model_data$s_perp <- y_sector - sector_fitted
+  
+  # Second regression: decompose stock volatility into market, sector and
+  # relative components
+  y_stock <- as.numeric(model_data$y_stock)
+  s_perp <- as.numeric(model_data$s_perp)
+  
+  stock_x <- cbind(
+    intercept = 1,
+    y_market = y_market,
+    s_perp = s_perp
+  )
+  
+  stock_fit <- tryCatch(
+    stats::lm.fit(
+      x = stock_x,
+      y = y_stock
+    ),
+    error = function(e) NULL
+  )
+  
+  if (is.null(stock_fit) || is.null(stock_fit$coefficients)) {
+    return(NULL)
+  }
+  
+  stock_coefs <- stock_fit$coefficients
+  names(stock_coefs) <- colnames(stock_x)
+  
+  if (!all(is.finite(stock_coefs))) {
+    return(NULL)
+  }
+  
+  model_data$y_systematic <- as.numeric(stock_x %*% stock_coefs)
+  model_data$q <- y_stock - model_data$y_systematic
+  
+  # Extract decomposition coefficients
+  alpha_hat <- unname(stock_coefs["intercept"])
   beta_market_hat <- unname(stock_coefs["y_market"])
   beta_sector_hat <- unname(stock_coefs["s_perp"])
   
-  sector_intercept_hat <- unname(sector_coefs["(Intercept)"])
+  sector_intercept_hat <- unname(sector_coefs["intercept"])
   sector_beta_market_hat <- unname(sector_coefs["y_market"])
   
   coefficient_values <- c(
@@ -171,11 +204,48 @@ FitRelativeDecompositionWindow <- function(window_data, minimum_observations) {
 
 
 
+#________________________FAST_ROLLING_MEAN_ALL_FINITE___________________________
+
+# This helper function computes rolling means on a numeric vector. A rolling
+# mean is returned only when all observations inside the rolling window are
+# finite. Otherwise, the corresponding value is set to NA.
+
+FastRollingMeanAllFinite <- function(series, window_length) {
+  
+  series <- as.numeric(series)
+  n <- length(series)
+  output <- rep(NA_real_, n)
+  if (n < window_length) {
+    return(output)
+  }
+  finite_values <- is.finite(series)
+  clean_series <- series
+  clean_series[!finite_values] <- 0
+  cumulative_sum <- c(0, cumsum(clean_series))
+  cumulative_count <- c(0, cumsum(as.integer(finite_values)))
+  end_indices <- window_length:n
+  start_indices <- end_indices - window_length + 1
+  window_sums <- cumulative_sum[end_indices + 1] -
+    cumulative_sum[start_indices]
+  
+  window_counts <- cumulative_count[end_indices + 1] -
+    cumulative_count[start_indices]
+  
+  rolling_means <- window_sums / window_length
+  rolling_means[window_counts != window_length] <- NA_real_
+  
+  output[end_indices] <- rolling_means
+  
+  return(output)
+}
+
+
+
 #_______________________FORECAST_HAR_ONE_STEP_FROM_SERIES_______________________
 
 # This function estimates a HAR model on one generic time series and produces
-# one one-step-ahead forecast. It reuses BuildHARDataForTicker() from HAR.R by
-# temporarily storing the input series as a dataframe column named "component".
+# one one-step-ahead forecast. It builds the HAR regressors directly from
+# numeric vectors.
 
 ForecastHAROneStepFromSeries <- function(dates, series, component_name,
                                          first_lag = 1, second_lag = 5,
@@ -200,102 +270,117 @@ ForecastHAROneStepFromSeries <- function(dates, series, component_name,
   
   max_lag <- max(lags)
   
-  # Create a temporary dataframe compatible with BuildHARDataForTicker()
-  temp_data <- data.frame(
-    date = dates,
-    component = series,
-    stringsAsFactors = FALSE
-  )
+  # Order observations by date
+  order_index <- order(dates)
+  dates <- dates[order_index]
+  series <- series[order_index]
   
-  temp_data <- temp_data[order(temp_data$date), ]
-  rownames(temp_data) <- NULL
+  n <- length(series)
   
   # Check that there are enough raw observations
-  if (nrow(temp_data) < (max_lag + 2)) {
+  if (n < (max_lag + 1)) {
     return(NULL)
   }
   
-  # Build HAR regression data using the existing HAR.R function
-  har_data <- tryCatch(
-    BuildHARDataForTicker(
-      daily_log_rv_wide = temp_data,
-      ticker = "component",
-      first_lag = first_lag,
-      second_lag = second_lag,
-      third_lag = third_lag
+  # Build HAR components directly from numeric vectors
+  daily_all <- FastRollingMeanAllFinite(
+    series = series,
+    window_length = first_lag
+  )
+  
+  weekly_all <- FastRollingMeanAllFinite(
+    series = series,
+    window_length = second_lag
+  )
+  
+  monthly_all <- FastRollingMeanAllFinite(
+    series = series,
+    window_length = third_lag
+  )
+  
+  # The first usable origin is the maximum HAR lag. The last usable origin is
+  # the day before the last observation because the target is one day ahead.
+  origin_indices <- max_lag:(n - 1)
+  
+  target <- series[origin_indices + 1]
+  daily <- daily_all[origin_indices]
+  weekly <- weekly_all[origin_indices]
+  monthly <- monthly_all[origin_indices]
+  
+  complete_rows <- is.finite(target) &
+    is.finite(daily) &
+    is.finite(weekly) &
+    is.finite(monthly)
+  
+  if (sum(complete_rows) < minimum_har_observations) {
+    return(NULL)
+  }
+  
+  target <- target[complete_rows]
+  daily <- daily[complete_rows]
+  weekly <- weekly[complete_rows]
+  monthly <- monthly[complete_rows]
+  
+  # Estimate the HAR model using a numeric design matrix
+  design_matrix <- cbind(
+    intercept = 1,
+    daily = daily,
+    weekly = weekly,
+    monthly = monthly
+  )
+  
+  har_model <- tryCatch(
+    stats::lm.fit(
+      x = design_matrix,
+      y = target
     ),
     error = function(e) NULL
   )
   
-  if (is.null(har_data) || nrow(har_data) < minimum_har_observations) {
+  if (is.null(har_model) || is.null(har_model$coefficients)) {
     return(NULL)
   }
   
-  # Estimate the HAR model
-  har_model <- stats::lm(
-    target ~ daily + weekly + monthly,
-    data = har_data
-  )
+  har_coefs <- har_model$coefficients
+  names(har_coefs) <- colnames(design_matrix)
+  
+  if (!all(is.finite(har_coefs))) {
+    return(NULL)
+  }
   
   # Build current HAR predictors using the last available observation
-  last_index <- nrow(temp_data)
-  
-  daily_current <- mean(
-    temp_data$component[(last_index - (first_lag - 1)):last_index],
-    na.rm = FALSE
+  current_values <- c(
+    daily_all[n],
+    weekly_all[n],
+    monthly_all[n]
   )
-  
-  weekly_current <- mean(
-    temp_data$component[(last_index - (second_lag - 1)):last_index],
-    na.rm = FALSE
-  )
-  
-  monthly_current <- mean(
-    temp_data$component[(last_index - (third_lag - 1)):last_index],
-    na.rm = FALSE
-  )
-  
-  current_values <- c(daily_current, weekly_current, monthly_current)
   
   if (!all(is.finite(current_values))) {
     return(NULL)
   }
   
-  new_data <- data.frame(
-    daily = daily_current,
-    weekly = weekly_current,
-    monthly = monthly_current
+  current_design <- c(
+    intercept = 1,
+    daily = current_values[1],
+    weekly = current_values[2],
+    monthly = current_values[3]
   )
   
   # Produce the one-step-ahead forecast
-  forecast_value <- tryCatch(
-    as.numeric(stats::predict(har_model, newdata = new_data)),
-    error = function(e) NA_real_
-  )
+  forecast_value <- as.numeric(sum(current_design * har_coefs))
   
   if (!is.finite(forecast_value)) {
     return(NULL)
   }
   
-  # Extract HAR coefficients
-  har_coefs <- stats::coef(har_model)
-  
-  get_coef <- function(name) {
-    if (name %in% names(har_coefs) && is.finite(har_coefs[name])) {
-      return(unname(har_coefs[name]))
-    } else {
-      return(NA_real_)
-    }
-  }
-  
   result <- list(
     component_name = component_name,
     forecast = forecast_value,
-    intercept = get_coef("(Intercept)"),
-    beta_daily = get_coef("daily"),
-    beta_weekly = get_coef("weekly"),
-    beta_monthly = get_coef("monthly"),
-    n_obs = nrow(har_data)
+    intercept = unname(har_coefs["intercept"]),
+    beta_daily = unname(har_coefs["daily"]),
+    beta_weekly = unname(har_coefs["weekly"]),
+    beta_monthly = unname(har_coefs["monthly"]),
+    n_obs = length(target)
   )
   
   return(result)
@@ -347,6 +432,15 @@ RollingRelativeHARForecastByTicker <- function(daily_log_rv_wide, ticker,
     y_sector = as.numeric(daily_log_rv_wide[[sector_etf]]),
     stringsAsFactors = FALSE
   )
+  
+  # Keep only complete and finite observations before defining rolling windows
+  model_panel <- model_panel[
+    is.finite(model_panel$y_stock) &
+      is.finite(model_panel$y_market) &
+      is.finite(model_panel$y_sector),
+  ]
+  
+  rownames(model_panel) <- NULL
   
   # Define the raw rolling window length.
   # With HAR lags 1, 5, 22, a window of training_window HAR rows requires
