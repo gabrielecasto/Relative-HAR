@@ -210,7 +210,7 @@ SIGNATURE_PLOT_DF <- PrepareSignaturePlotData(
   ticker_sector_table = TICKER_SECTOR_TABLE,
   plateau_intervals = 10:30,
   noise_intervals = 1:2,
-  reference_interval = 15,
+  reference_interval = 20,
   minimum_days_required = 50,
   drop_invalid_plateau = TRUE
 )
@@ -244,7 +244,7 @@ P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
   lower_band_col = "p10_ratio",
   upper_band_col = "p90_ratio",
   median_col = "median_ratio",
-  reference_interval = 10,
+  reference_interval = 20,
   y_limits = NULL,
   output_path = "figures/signature_spaghetti.pdf"
 )
@@ -255,7 +255,7 @@ P_SIGNATURE_HEATMAP <- PlotSignatureHeatmap(
   signature_plot_df = SIGNATURE_PLOT_DF,
   fill_col = "log_rv_ratio",
   order_col = "noise_ratio",
-  reference_interval = 15,
+  reference_interval = 20,
   cap_quantile = 0.98,
   show_ticker_labels = FALSE,
   output_path = "figures/signature_heatmap.pdf"
@@ -270,7 +270,7 @@ P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   lower_band_col = "p25_ratio",
   upper_band_col = "p75_ratio",
   median_col = "median_ratio",
-  reference_interval = 15,
+  reference_interval = 20,
   y_limits = NULL,
   facet_ncol = 3,
   output_path = "figures/signature_by_sector.pdf"
@@ -310,11 +310,11 @@ cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
                        unique(TICKER_SECTOR_TABLE$sector_etf))
 
-# Build 15-minutes daily Realized Variance panel
-DAILY_RV_15MIN <- BuildDailyRVPanel(
+# Build 20-minutes daily Realized Variance panel
+DAILY_RV_20MIN <- BuildDailyRVPanel(
   DF = DT,
   tickers = STOCK_TICKERS_HAR,
-  interval_minutes = 15,
+  interval_minutes = 20,
   date_col_name = "datetime",
   include_partial_last_block = FALSE,
   minimum_blocks_required = 1
@@ -322,7 +322,7 @@ DAILY_RV_15MIN <- BuildDailyRVPanel(
 
 # Estimate rolling HAR and report prediction errors out-of-sample (1-step ahead)
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
-  daily_log_rv_wide = DAILY_RV_10MIN,
+  daily_log_rv_wide = DAILY_RV_20MIN,
   tickers = STOCK_TICKERS_HAR,
   training_window = 500,
   first_lag = 1,
@@ -339,14 +339,14 @@ future::plan(future::multisession, workers=4)
 cat("Workers before import:", future::nbrOfWorkers(), "\n")
 
 RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
-  daily_log_rv_wide = DAILY_RV_10MIN,
+  daily_log_rv_wide = DAILY_RV_20MIN,
   ticker_sector_table = TICKER_SECTOR_TABLE,
   market_ticker = "SPY",
   date_col_name = "date"
 )
 
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
-  daily_log_rv_wide = DAILY_RV_10MIN,
+  daily_log_rv_wide = DAILY_RV_20MIN,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
   training_window = 500,
   market_ticker = "SPY",
