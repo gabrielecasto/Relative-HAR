@@ -329,7 +329,8 @@ RollingRelativeHARForecastByTicker <- function(daily_log_rv_wide, ticker,
   required_tickers <- c(ticker, market_ticker, sector_etf)
   
   if (!all(required_tickers %in% names(daily_log_rv_wide))) {
-    warning(paste("Skipping", ticker, "- missing stock, market or sector data."))
+    warning(paste("Skipping", ticker,
+                  "- missing stock, market or sector data."))
     return(NULL)
   }
   
@@ -482,7 +483,10 @@ RollingRelativeHARForecastByTicker <- function(daily_log_rv_wide, ticker,
   }
   
   # Combine all forecast-error rows
-  forecast_errors <- do.call(rbind, forecast_list)
+  forecast_errors <- data.table::rbindlist(forecast_list, use.names = TRUE,
+    fill = FALSE)
+  
+  forecast_errors <- as.data.frame(forecast_errors)
   rownames(forecast_errors) <- NULL
   
   return(forecast_errors)
@@ -598,7 +602,13 @@ RollingRelativeHARForecastPanel <- function(daily_log_rv_wide,
   }
   
   # Combine all ticker-level forecast-error dataframes
-  forecast_errors_panel <- do.call(rbind, forecast_list)
+  forecast_errors_panel <- data.table::rbindlist(
+    forecast_list,
+    use.names = TRUE,
+    fill = FALSE
+  )
+  
+  forecast_errors_panel <- as.data.frame(forecast_errors_panel)
   rownames(forecast_errors_panel) <- NULL
   
   # Order final output by ticker and target date
