@@ -140,10 +140,11 @@ suppressWarnings(ETFS[!(ETFS %in% names(PRICES))])
 
 PRICES <- FilterB(Minutes_Big_Gap = 10,
                   Maximum_N_Big_Gaps = 0.10,
-                  Max_Gap_Allowed = 20)
+                  Max_Gap_Allowed = 22)
 
-# Check if ETFS are in PIRCES
+# Check if ETFS and SPY are in PIRCES
 suppressWarnings(ETFS[!(ETFS %in% names(PRICES))])
+suppressWarnings("SPY"[!("SPY" %in% names(PRICES))])
 
 # Fill missing prices per ticker by carrying the last observation forward (LOCF)
 # and then backward (NOCB) to eliminate internal and edge NAs; store the filled
@@ -162,8 +163,12 @@ DT <- out1$DT
 tickers <- out1$tickers
 rm(out1, PRICES_FILLED);invisible(gc())
 
-# Check if ETFS are in DT
-suppressWarnings(setdiff(ETFS, colnames(DT)))
+# Check if ETFS and SPY are in DT
+suppressWarnings(ETFS[!(ETFS %in% names(DT))])
+suppressWarnings("SPY"[!("SPY" %in% names(DT))])
+
+# Drop INTRADAY_WIDE_DF
+rm(INTRADAY_WIDE_DF); invisible(gc())
 
 
 
