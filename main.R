@@ -8,7 +8,7 @@
 #________________________________PREPARATION____________________________________
 
 # Clean the environment
-rm(list = ls()); gc()
+#rm(list = ls()); gc()
 
 # Reset the parallel plan
 future::plan(future::sequential)
@@ -23,9 +23,10 @@ sources <- c(
   "sectors.R",
   "signature.R",
   "signature_plots.R",
+  "daily_RV_chechs",
   "HAR.R",
   "relative_HAR.R",
-  "model_comparison_plots.R"
+  "model_comparison_plots.R",
 )
 
 stopifnot(all(file.exists(sources)))
@@ -323,15 +324,76 @@ DAILY_RV_20MIN <- BuildDailyRVPanel(
   minimum_blocks_required = 1
 )
 
+# Clean daily RV panel
+# Remove dates where SPY or any sector ETF has non-finite daily log RV.
+# These dates cannot be used by the relative HAR model, so they are removed
+# before estimating both HAR and relative HAR.
+
+BENCHMARK_TICKERS <- unique(c("SPY", TICKER_SECTOR_TABLE$sector_etf))
+
+BENCHMARK_TICKERS <- BENCHMARK_TICKERS[
+  BENCHMARK_TICKERS %in% names(DAILY_RV_20MIN)
+]
+
+bad_benchmark_rows <- Reduce(
+  `|`,
+  lapply(BENCHMARK_TICKERS, function(ticker) {
+    !is.finite(DAILY_RV_20MIN[[ticker]])
+  })
+)
+
+BAD_BENCHMARK_DATES <- DAILY_RV_20MIN$date[bad_benchmark_rows]
+
+cat("Dropped benchmark bad dates:\n")
+print(BAD_BENCHMARK_DATES)
+
+DAILY_RV_20MIN <- DAILY_RV_20MIN[!bad_benchmark_rows, ]
+rownames(DAILY_RV_20MIN) <- NULL
+
+
+# Remove DOW because it has ticker-specific missing daily log RV observations
+if ("DOW" %in% names(DAILY_RV_20MIN)) {
+  DAILY_RV_20MIN$DOW <- NULL
+}
+
+# Use the same stock universe for standard HAR and relative HAR
+STOCK_TICKERS_HAR <- RELATIVE_HAR_TICKERS$ticker
+
+# Prepare the relative HAR ticker universe after cleaning the daily RV panel
+RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
+  daily_log_rv_wide = DAILY_RV_20MIN,
+  ticker_sector_table = TICKER_SECTOR_TABLE,
+  market_ticker = "SPY",
+  date_col_name = "date"
+)
+
+# Checks on the cleaned RV to ensure comparability across models
+DAILY_RV_CHECKS <- CheckDailyRVPanelQuality(
+  daily_rv_panel = DAILY_RV_20MIN,
+  ticker_sector_table = TICKER_SECTOR_TABLE,
+  relative_har_tickers = RELATIVE_HAR_TICKERS,
+  market_ticker = "SPY",
+  bad_benchmark_dates = BAD_BENCHMARK_DATES,
+  removed_tickers = c("DOW")
+)
+
+# Use the same stock universe for standard HAR and relative HAR
+STOCK_TICKERS_HAR <- RELATIVE_HAR_TICKERS$ticker
+
 # Estimate rolling HAR and report prediction errors out-of-sample (1-step ahead)
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_20MIN,
-  tickers = c(TICKER_SECTOR_TABLE$ticker),
+  tickers = STOCK_TICKERS_HAR,
   training_window = 750,
   first_lag = 1,
   second_lag = 5,
   third_lag = 22
 )
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 
 
@@ -340,13 +402,6 @@ HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
 # Set parallel plan for relative HAR model
 future::plan(future::multisession, workers=4)
 cat("Workers before import:", future::nbrOfWorkers(), "\n")
-
-RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
-  daily_log_rv_wide = DAILY_RV_20MIN,
-  ticker_sector_table = TICKER_SECTOR_TABLE,
-  market_ticker = "SPY",
-  date_col_name = "date"
-)
 
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_20MIN,
