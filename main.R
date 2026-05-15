@@ -326,8 +326,8 @@ DAILY_RV_20MIN <- BuildDailyRVPanel(
 # Estimate rolling HAR and report prediction errors out-of-sample (1-step ahead)
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_20MIN,
-  tickers = STOCK_TICKERS_HAR,
-  training_window = 500,
+  tickers = c(TICKER_SECTOR_TABLE$ticker),
+  training_window = 750,
   first_lag = 1,
   second_lag = 5,
   third_lag = 22
@@ -351,7 +351,7 @@ RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_20MIN,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
-  training_window = 500,
+  training_window = 750,
   market_ticker = "SPY",
   first_lag = 1,
   second_lag = 5,
@@ -375,6 +375,17 @@ MODEL_COMPARISON <- BuildModelComparisonPanel(
   har_forecast_errors = HAR_FORECAST_ERRORS,
   relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS
 )
+
+# Check comparison sample
+cat("HAR raw rows:", nrow(HAR_FORECAST_ERRORS), "\n")
+cat("Relative HAR raw rows:", nrow(RELATIVE_HAR_FORECAST_ERRORS), "\n")
+cat("Paired comparison rows:", nrow(MODEL_COMPARISON$paired), "\n")
+
+cat("HAR raw tickers:", length(unique(HAR_FORECAST_ERRORS$ticker)), "\n")
+cat("Relative HAR tickers:", 
+    length(unique(RELATIVE_HAR_FORECAST_ERRORS$ticker)), "\n")
+cat("Comparison tickers:", 
+    length(unique(MODEL_COMPARISON$paired$ticker)), "\n")
 
 # Plot the percentage out of sample estimation errors for HAR and relative_HAR
 # over time, by sector
