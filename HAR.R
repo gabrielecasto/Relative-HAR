@@ -165,12 +165,6 @@ BuildHARDataForTicker <- function(daily_log_rv_wide, ticker, first_lag = 1,
   first_origin_index <- max_lag
   last_origin_index <- length(log_rv) - 1
   
-  # Define the valid time indices
-  # The first usable origin is day third_lag. The last usable origin is the day
-  # before the last observation because the target is one day ahead.
-  first_origin_index <- third_lag
-  last_origin_index <- length(log_rv) - 1
-  
   # Build HAR regressors for each valid forecasting origin
   har_list <- lapply(first_origin_index:last_origin_index,
                      function(time_index) {

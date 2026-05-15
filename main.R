@@ -1,3 +1,6 @@
+
+
+
 # In this section we can run the whole script, using functions from other
 # files in the same working directory
 
@@ -5,7 +8,7 @@
 #________________________________PREPARATION____________________________________
 
 # Clean the environment
-#rm(list = ls()); gc()
+rm(list = ls()); gc()
 
 # Reset the parallel plan
 future::plan(future::sequential)
