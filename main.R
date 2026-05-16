@@ -223,9 +223,7 @@ rm(STOCK_TICKERS);invisible(gc())
 SIGNATURE_PLOT_DF <- PrepareSignaturePlotData(
   signature_by_stock = SIGNATURE_BY_STOCK,
   ticker_sector_table = TICKER_SECTOR_TABLE,
-  plateau_intervals = 10:30,
-  noise_intervals = 1:2,
-  reference_interval = 20,
+  plateau_intervals = 40:70,
   minimum_days_required = 50,
   drop_invalid_plateau = TRUE
 )
@@ -284,7 +282,7 @@ future::plan(future::sequential)
 invisible(gc())
 cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
-rm(P_SIGNATURE_HEATMAP, P_SIGNATURE_SECTOR, P_SIGNATURE_SPAGHETTI,
+rm(P_SIGNATURE_SECTOR, P_SIGNATURE_SPAGHETTI,
    SIGNATURE_SECTOR_SUMMARY, SIGNATURE_PLOT_DF, SIGNATURE_INTERVAL_SUMMARY)
 invisible(gc())
 
