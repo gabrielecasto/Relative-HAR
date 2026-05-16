@@ -1,3 +1,14 @@
+
+
+
+# In this section we prepare and plot the volatility signature results. Starting
+# from the stock-level realized variance estimates computed at different
+# sampling intervals, we normalize each stock by its own stable plateau level.
+# Then, we build cross-sectional and sector-level summaries and produce plots
+# that show how realized variance changes across sampling frequencies.
+
+
+
 #_________________________PREPARE_SIGNATURE_PLOT_DATA___________________________
 
 # This function prepares the volatility signature data for plotting.
@@ -615,3 +626,7 @@ PlotSignatureBySector <- function(signature_sector_summary,
   # Return the ggplot object
   return(p)
 }
+
+
+
+#_____________________________END_OF_THE_SCRIPT_________________________________

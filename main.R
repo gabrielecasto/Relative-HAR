@@ -178,6 +178,11 @@ rm(INTRADAY_WIDE_DF); invisible(gc())
 
 #____________________________VOLATILITY_SIGNATURE_______________________________
 
+# In this section we compute the volatility signature for each selected stock.
+# Starting from one-minute intraday log returns, we aggregate returns over
+# different time intervals, compute daily realized variance for each interval,
+# and then summarize the average realized variance across trading days.
+
 # Set parallel plan for signature plot
 future::plan(future::multisession, workers = 4)
 cat("Workers before signature:", future::nbrOfWorkers(), "\n")
@@ -208,7 +213,13 @@ rm(STOCK_TICKERS);invisible(gc())
 
 #_____________________________SIGNATURE_PLOTS___________________________________
 
+# In this section we prepare and plot the volatility signature results. Starting
+# from the stock-level realized variance estimates computed at different
+# sampling intervals, we normalize each stock by its own stable plateau level.
+# Then, we build cross-sectional and sector-level summaries and produce plots
+# that show how realized variance changes across sampling frequencies.
 
+# Prepare the plot-ready volatility signature dataframe
 SIGNATURE_PLOT_DF <- PrepareSignaturePlotData(
   signature_by_stock = SIGNATURE_BY_STOCK,
   ticker_sector_table = TICKER_SECTOR_TABLE,
@@ -219,11 +230,13 @@ SIGNATURE_PLOT_DF <- PrepareSignaturePlotData(
   drop_invalid_plateau = TRUE
 )
 
+# Build the cross-sectional summary across sampling intervals
 SIGNATURE_INTERVAL_SUMMARY <- BuildSignatureIntervalSummary(
   signature_plot_df = SIGNATURE_PLOT_DF,
   ratio_col = "rv_ratio"
 )
 
+# Build the sector-level summary of the normalized signature
 SIGNATURE_SECTOR_SUMMARY <- BuildSignatureSectorSummary(
   signature_plot_df = SIGNATURE_PLOT_DF,
   sector_col = "sector",
@@ -232,6 +245,7 @@ SIGNATURE_SECTOR_SUMMARY <- BuildSignatureSectorSummary(
   drop_missing_sector = TRUE
 )
 
+# Plot the normalized volatility signature across all stocks
 P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
   signature_plot_df = SIGNATURE_PLOT_DF,
   signature_interval_summary = SIGNATURE_INTERVAL_SUMMARY,
@@ -248,6 +262,7 @@ P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
 
 print(P_SIGNATURE_SPAGHETTI)
 
+# Plot the normalized volatility signature separately by sector
 P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   signature_sector_summary = SIGNATURE_SECTOR_SUMMARY,
   sector_col = "sector",
@@ -263,7 +278,6 @@ P_SIGNATURE_SECTOR <- PlotSignatureBySector(
 )
 
 print(P_SIGNATURE_SECTOR)
-
 
 # Reset the parallel plan
 future::plan(future::sequential)
