@@ -8,7 +8,7 @@
 #________________________________PREPARATION____________________________________
 
 # Clean the environment
-#rm(list = ls()); gc()
+rm(list = ls()); gc()
 
 # Reset the parallel plan
 future::plan(future::sequential)
@@ -25,6 +25,7 @@ sources <- c(
   "signature_plots.R",
   "daily_RV_checks.R",
   "HAR.R",
+  "HAR_X_market_sector.R",
   "relative_HAR.R",
   "model_comparison_plots.R"
 )
@@ -203,7 +204,7 @@ SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   intervals = 1:70,
   date_col_name = "datetime",
   include_partial_last_block = TRUE,
-  minimum_days_required = 1,
+  minimum_days_required = 50,
   show_progress = TRUE
 )
 
@@ -308,14 +309,14 @@ cat("Workers before signature:", future::nbrOfWorkers(), "\n")
 STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
                        unique(TICKER_SECTOR_TABLE$sector_etf))
 
-# Build 20-minutes daily Realized Variance panel
+# Build 30-minutes daily Realized Variance panel
 DAILY_RV_30MIN <- BuildDailyRVPanel(
   DF = DT,
   tickers = STOCK_TICKERS_HAR,
   interval_minutes = 30,
   date_col_name = "datetime",
   include_partial_last_block = FALSE,
-  minimum_blocks_required = 1
+  minimum_blocks_required = 10
 )
 
 # Clean daily RV panel
@@ -399,7 +400,7 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 # Set parallel plan for relative HAR model
 future::plan(future::multisession, workers=4)
-cat("Workers before import:", future::nbrOfWorkers(), "\n")
+cat("Workers before relative HAR:", future::nbrOfWorkers(), "\n")
 
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   daily_log_rv_wide = DAILY_RV_30MIN,
