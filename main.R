@@ -251,7 +251,8 @@ P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
   lower_band_col = "p10_ratio",
   upper_band_col = "p90_ratio",
   median_col = "median_ratio",
-  reference_interval = 20,
+  reference_interval = 30,
+  x_breaks = c(1, 2, 5, 10, 15, 20, 30, 40, 50, 60, 70),
   y_limits = NULL,
   title = "Volatility Signature Plot",
   subtitle = "Normalized realized volatility across stocks",
@@ -267,7 +268,8 @@ P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   lower_band_col = "p25_ratio",
   upper_band_col = "p75_ratio",
   median_col = "median_ratio",
-  reference_interval = 20,
+  reference_interval = 30,
+  x_breaks = c(1, 2, 5, 10, 15, 20, 30, 40, 50, 60, 70),
   y_limits = NULL,
   title = "Sector-Level Volatility Signature Plot",
   subtitle = "Normalized realized volatility by sector",
@@ -307,10 +309,10 @@ STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
                        unique(TICKER_SECTOR_TABLE$sector_etf))
 
 # Build 20-minutes daily Realized Variance panel
-DAILY_RV_20MIN <- BuildDailyRVPanel(
+DAILY_RV_30MIN <- BuildDailyRVPanel(
   DF = DT,
   tickers = STOCK_TICKERS_HAR,
-  interval_minutes = 20,
+  interval_minutes = 30,
   date_col_name = "datetime",
   include_partial_last_block = FALSE,
   minimum_blocks_required = 1
@@ -324,33 +326,33 @@ DAILY_RV_20MIN <- BuildDailyRVPanel(
 BENCHMARK_TICKERS <- unique(c("SPY", TICKER_SECTOR_TABLE$sector_etf))
 
 BENCHMARK_TICKERS <- BENCHMARK_TICKERS[
-  BENCHMARK_TICKERS %in% names(DAILY_RV_20MIN)
+  BENCHMARK_TICKERS %in% names(DAILY_RV_30MIN)
 ]
 
 bad_benchmark_rows <- Reduce(
   `|`,
   lapply(BENCHMARK_TICKERS, function(ticker) {
-    !is.finite(DAILY_RV_20MIN[[ticker]])
+    !is.finite(DAILY_RV_30MIN[[ticker]])
   })
 )
 
-BAD_BENCHMARK_DATES <- DAILY_RV_20MIN$date[bad_benchmark_rows]
+BAD_BENCHMARK_DATES <- DAILY_RV_30MIN$date[bad_benchmark_rows]
 
 cat("Dropped benchmark bad dates:\n")
 print(BAD_BENCHMARK_DATES)
 
-DAILY_RV_20MIN <- DAILY_RV_20MIN[!bad_benchmark_rows, ]
-rownames(DAILY_RV_20MIN) <- NULL
+DAILY_RV_30MIN <- DAILY_RV_30MIN[!bad_benchmark_rows, ]
+rownames(DAILY_RV_30MIN) <- NULL
 
 
 # Remove DOW because it has ticker-specific missing daily log RV observations
-if ("DOW" %in% names(DAILY_RV_20MIN)) {
-  DAILY_RV_20MIN$DOW <- NULL
+if ("DOW" %in% names(DAILY_RV_30MIN)) {
+  DAILY_RV_30MIN$DOW <- NULL
 }
 
 # Prepare the relative HAR ticker universe after cleaning the daily RV panel
 RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
-  daily_log_rv_wide = DAILY_RV_20MIN,
+  daily_log_rv_wide = DAILY_RV_30MIN,
   ticker_sector_table = TICKER_SECTOR_TABLE,
   market_ticker = "SPY",
   date_col_name = "date"
@@ -365,7 +367,7 @@ rownames(RELATIVE_HAR_TICKERS) <- NULL
 
 # Checks on the cleaned RV to ensure comparability across models
 DAILY_RV_CHECKS <- CheckDailyRVPanelQuality(
-  daily_rv_panel = DAILY_RV_20MIN,
+  daily_rv_panel = DAILY_RV_30MIN,
   ticker_sector_table = TICKER_SECTOR_TABLE,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
   market_ticker = "SPY",
@@ -378,7 +380,7 @@ STOCK_TICKERS_HAR <- RELATIVE_HAR_TICKERS$ticker
 
 # Estimate rolling HAR and report prediction errors out-of-sample (1-step ahead)
 HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
-  daily_log_rv_wide = DAILY_RV_20MIN,
+  daily_log_rv_wide = DAILY_RV_30MIN,
   tickers = STOCK_TICKERS_HAR,
   training_window = 750,
   first_lag = 1,
@@ -400,7 +402,7 @@ future::plan(future::multisession, workers=4)
 cat("Workers before import:", future::nbrOfWorkers(), "\n")
 
 RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
-  daily_log_rv_wide = DAILY_RV_20MIN,
+  daily_log_rv_wide = DAILY_RV_30MIN,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
   training_window = 750,
   market_ticker = "SPY",
