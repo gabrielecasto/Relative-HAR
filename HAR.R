@@ -290,6 +290,16 @@ RollingHARForecastByTicker <- function(har_data, training_window = 100) {
     stop("har_data must refer to one ticker only.", call. = FALSE)
   }
   
+  # Pre-build the HAR design matrix once.
+  x_matrix <- cbind(
+    intercept = 1,
+    daily = har_data$daily,
+    weekly = har_data$weekly,
+    monthly = har_data$monthly
+  )
+  
+  y_vector <- har_data$target
+  
   # Define the out-of-sample test indices
   test_indices <- (training_window + 1):nrow(har_data)
   
@@ -300,23 +310,24 @@ RollingHARForecastByTicker <- function(har_data, training_window = 100) {
     train_start <- test_index - training_window
     train_end <- test_index - 1
     
-    train_data <- har_data[train_start:train_end, ]
-    test_data <- har_data[test_index, ]
+    train_rows <- train_start:train_end
     
     # Fit the HAR model on the rolling training window
-    har_model <- stats::lm(
-      target ~ daily + weekly + monthly,
-      data = train_data
+    har_model <- stats::lm.fit(
+      x = x_matrix[train_rows, , drop = FALSE],
+      y = y_vector[train_rows]
     )
     
-    # Produce the one-step-ahead forecast
-    forecast_value <- as.numeric(stats::predict(
-      har_model,
-      newdata = test_data
+    # Use the estimated coefficients to produce the one-step-ahead forecast
+    rank <- har_model$rank
+    pivot <- har_model$qr$pivot[seq_len(rank)]
+    
+    forecast_value <- as.numeric(sum(
+      x_matrix[test_index, pivot] * har_model$coefficients[pivot]
     ))
     
     # Extract the realized value
-    actual_value <- test_data$target
+    actual_value <- y_vector[test_index]
     
     # Compute forecast errors
     error_value <- actual_value - forecast_value
@@ -329,8 +340,8 @@ RollingHARForecastByTicker <- function(har_data, training_window = 100) {
     
     data.frame(
       ticker = ticker,
-      forecast_origin_date = test_data$origin_date,
-      target_date = test_data$target_date,
+      forecast_origin_date = har_data$origin_date[test_index],
+      target_date = har_data$target_date[test_index],
       actual = actual_value,
       forecast = forecast_value,
       error = error_value,
@@ -342,7 +353,13 @@ RollingHARForecastByTicker <- function(har_data, training_window = 100) {
   })
   
   # Combine all forecast-error rows
-  forecast_errors <- do.call(rbind, forecast_list)
+  forecast_errors <- data.table::rbindlist(
+    forecast_list,
+    use.names = TRUE,
+    fill = FALSE
+  )
+  
+  forecast_errors <- as.data.frame(forecast_errors)
   rownames(forecast_errors) <- NULL
   
   return(forecast_errors)
@@ -380,31 +397,40 @@ RollingHARForecastPanel <- function(daily_log_rv_wide,
     stop("No valid tickers found in daily_log_rv_wide.", call. = FALSE)
   }
   
-  # Estimate rolling HAR forecasts separately for each ticker
-  forecast_list <- future.apply::future_lapply(tickers, function(ticker) {
+  # Estimate rolling HAR forecasts separately for each ticker.
+  # Progress is shown by default using progressr, as defined in setup.R.
+  forecast_list <- progressr::with_progress({
     
-    # Build the HAR regression dataframe for the selected ticker
-    har_data <- BuildHARDataForTicker(
-      daily_log_rv_wide = daily_log_rv_wide,
-      ticker = ticker,
-      first_lag = first_lag,
-      second_lag = second_lag,
-      third_lag = third_lag
-    )
+    p <- progressr::progressor(steps = length(tickers))
     
-    # Skip tickers with too few observations for the selected training window
-    if (nrow(har_data) <= training_window) {
-      warning(paste("Skipping", ticker, "- not enough HAR observations."))
-      return(NULL)
-    }
-    
-    # Estimate rolling HAR forecasts for the selected ticker
-    forecast_errors <- RollingHARForecastByTicker(
-      har_data = har_data,
-      training_window = training_window
-    )
-    
-    return(forecast_errors)
+    future.apply::future_lapply(tickers, function(ticker) {
+      
+      # Build the HAR regression dataframe for the selected ticker
+      har_data <- BuildHARDataForTicker(
+        daily_log_rv_wide = daily_log_rv_wide,
+        ticker = ticker,
+        first_lag = first_lag,
+        second_lag = second_lag,
+        third_lag = third_lag
+      )
+      
+      # Skip tickers with too few observations for the selected training window
+      if (nrow(har_data) <= training_window) {
+        warning(paste("Skipping", ticker, "- not enough HAR observations."))
+        p(sprintf("ticker %s", ticker))
+        return(NULL)
+      }
+      
+      # Estimate rolling HAR forecasts for the selected ticker
+      forecast_errors <- RollingHARForecastByTicker(
+        har_data = har_data,
+        training_window = training_window
+      )
+      
+      p(sprintf("ticker %s", ticker))
+      
+      return(forecast_errors)
+    })
   })
   
   # Remove skipped tickers
@@ -415,7 +441,13 @@ RollingHARForecastPanel <- function(daily_log_rv_wide,
   }
   
   # Combine all ticker-level forecast-error dataframes
-  forecast_errors_panel <- do.call(rbind, forecast_list)
+  forecast_errors_panel <- data.table::rbindlist(
+    forecast_list,
+    use.names = TRUE,
+    fill = FALSE
+  )
+  
+  forecast_errors_panel <- as.data.frame(forecast_errors_panel)
   rownames(forecast_errors_panel) <- NULL
   
   return(forecast_errors_panel)
