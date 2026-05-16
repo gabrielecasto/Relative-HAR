@@ -23,7 +23,7 @@ sources <- c(
   "sectors.R",
   "signature.R",
   "signature_plots.R",
-  "daily_RV_chechs",
+  "daily_RV_checks.R",
   "HAR.R",
   "relative_HAR.R",
   "model_comparison_plots.R"
@@ -195,7 +195,7 @@ options(future.globals.maxSize = 8 * 1024^3)
 SIGNATURE_BY_STOCK <- BuildVolatilitySignature(
   DF = DT,
   tickers = STOCK_TICKERS_SIGNATURE,
-  intervals = 1:30,
+  intervals = 1:70,
   date_col_name = "datetime",
   include_partial_last_block = TRUE,
   minimum_days_required = 1,
@@ -232,15 +232,6 @@ SIGNATURE_SECTOR_SUMMARY <- BuildSignatureSectorSummary(
   drop_missing_sector = TRUE
 )
 
-
-SIGNATURE_DECISION_TABLE <- BuildSignatureDecisionTable(
-  signature_plot_df = SIGNATURE_PLOT_DF,
-  ratio_col = "rv_ratio"
-)
-
-print(SIGNATURE_DECISION_TABLE)
-
-
 P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
   signature_plot_df = SIGNATURE_PLOT_DF,
   signature_interval_summary = SIGNATURE_INTERVAL_SUMMARY,
@@ -250,23 +241,12 @@ P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
   median_col = "median_ratio",
   reference_interval = 20,
   y_limits = NULL,
+  title = "Volatility Signature Plot",
+  subtitle = "Normalized realized volatility across stocks",
   output_path = "figures/signature_spaghetti.pdf"
 )
 
 print(P_SIGNATURE_SPAGHETTI)
-
-P_SIGNATURE_HEATMAP <- PlotSignatureHeatmap(
-  signature_plot_df = SIGNATURE_PLOT_DF,
-  fill_col = "log_rv_ratio",
-  order_col = "noise_ratio",
-  reference_interval = 20,
-  cap_quantile = 0.98,
-  show_ticker_labels = FALSE,
-  output_path = "figures/signature_heatmap.pdf"
-)
-
-print(P_SIGNATURE_HEATMAP)
-
 
 P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   signature_sector_summary = SIGNATURE_SECTOR_SUMMARY,
@@ -276,6 +256,8 @@ P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   median_col = "median_ratio",
   reference_interval = 20,
   y_limits = NULL,
+  title = "Sector-Level Volatility Signature Plot",
+  subtitle = "Normalized realized volatility by sector",
   facet_ncol = 3,
   output_path = "figures/signature_by_sector.pdf"
 )
@@ -289,9 +271,7 @@ invisible(gc())
 cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 rm(P_SIGNATURE_HEATMAP, P_SIGNATURE_SECTOR, P_SIGNATURE_SPAGHETTI,
-   SIGNATURE_AGGREGATE, SIGNATURE_SECTOR_SUMMARY, signature_plot,
-   SIGNATURE_PLOT_DF, SIGNATURE_BY_STOCK, SIGNATURE_DECISION_TABLE,
-   SIGNATURE_INTERVAL_SUMMARY)
+   SIGNATURE_SECTOR_SUMMARY, SIGNATURE_PLOT_DF, SIGNATURE_INTERVAL_SUMMARY)
 invisible(gc())
 
 
