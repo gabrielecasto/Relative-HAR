@@ -396,7 +396,45 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 
 
+#____________________________X_HAR_MARKET_SECTOR________________________________
+
+# In this section we build and estimate rolling HAR-X market-sector models for
+# realized volatility forecasting. The model extends the standard HAR benchmark
+# by adding market and sector information directly as additional regressors.
+# Starting from daily log realized variance series, we construct daily, weekly
+# and monthly HAR components for each stock, for the market benchmark, and for
+# the corresponding sector ETF. Then, we estimate rolling one-step-ahead OLS
+# forecasts and store the corresponding forecast errors.
+
+# Set parallel plan for HAR model
+future::plan(future::multisession, workers = 4)
+cat("Workers before signature:", future::nbrOfWorkers(), "\n")
+
+# Estimate rolling HAR-X market-sector forecasts out-of-sample (1-step ahead)
+HAR_X_MARKET_SECTOR_FORECAST_ERRORS <- RollingHARXMarketSectorForecastPanel(
+  daily_log_rv_wide = DAILY_RV_30MIN,
+  relative_har_tickers = RELATIVE_HAR_TICKERS,
+  training_window = 750,
+  market_ticker = "SPY",
+  first_lag = 1,
+  second_lag = 5,
+  third_lag = 22
+)
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
+
 #_______________________________RELATIVE_HAR____________________________________
+
+# In this section we build and estimate relative HAR models for realized
+# volatility forecasting. Starting from daily log realized variance series,
+# we decompose each stock volatility into market, sector-specific and relative
+# components. Then, we forecast each component separately and reconstruct the
+# one-step-ahead stock log realized variance forecast.
 
 # Set parallel plan for relative HAR model
 future::plan(future::multisession, workers=4)
@@ -412,6 +450,11 @@ RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
   third_lag = 22,
   minimum_observations = 30
 )
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 
 
