@@ -27,7 +27,6 @@ sources <- c(
   "HAR.R",
   "HAR_X_market_sector.R",
   "relative_HAR.R",
-  "HAR_X_orthogonalized_market_sector.R",
   "model_comparison_plots.R"
 )
 
@@ -117,7 +116,7 @@ cat("Workers before cleaning:", future::nbrOfWorkers(), "\n")
 
 
 
-#______________________________CLEANING_DATA____________________________________
+#_______________________________CLEANING_DATA___________________________________
 
 # In this section we clean the data. Start by building a master grid composed of
 # all the expected minutes for each day that we are considering.
@@ -421,6 +420,42 @@ HAR_X_MARKET_SECTOR_FORECAST_ERRORS <- RollingHARXMarketSectorForecastPanel(
   second_lag = 5,
   third_lag = 22
 )
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
+
+#_____________________ORTHOGONALIZED_X_HAR_MARKET_SECTOR________________________
+
+# In this section we build and estimate rolling orthogonalized HAR-X
+# market-sector models for realized volatility forecasting. The model keeps the
+# same 9-regressor structure as the raw HAR-X market-sector model, but it uses
+# orthogonalized market, sector and stock-specific components. For each rolling
+# window, the sector component is residualized with respect to the market, and
+# the stock component is residualized with respect to the market and the
+# orthogonal sector component. Then, daily, weekly and monthly HAR components
+# are built from these orthogonalized series and used in one multivariate OLS
+# forecast.
+
+# Set parallel plan for orthogonalized HAR-X model
+future::plan(future::multisession, workers = 4)
+cat("Workers before orthogonalized HAR-X:", future::nbrOfWorkers(), "\n")
+
+# Estimate rolling orthogonalized HAR-X forecasts out-of-sample (1-step ahead)
+HAR_X_ORTHOGONALIZED_MARKET_SECTOR_FORECAST_ERRORS <-
+  RollingOrthogonalizedHARXForecastPanel(
+    daily_log_rv_wide = DAILY_RV_30MIN,
+    relative_har_tickers = RELATIVE_HAR_TICKERS,
+    training_window = 750,
+    market_ticker = "SPY",
+    first_lag = 1,
+    second_lag = 5,
+    third_lag = 22,
+    minimum_observations = 30
+  )
 
 # Reset the parallel plan
 future::plan(future::sequential)
