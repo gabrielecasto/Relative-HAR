@@ -27,6 +27,7 @@ sources <- c(
   "HAR.R",
   "HAR_X_market_sector.R",
   "relative_HAR.R",
+  "HAR_X_orthogonalized_market_sector.R",
   "model_comparison_plots.R"
 )
 
