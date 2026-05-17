@@ -23,10 +23,10 @@ sources <- c(
   "sectors.R",
   "signature.R",
   "signature_plots.R",
-  "daily_RV_checks.R",
   "HAR.R",
   "HAR_X_market_sector.R",
   "relative_HAR.R",
+  "forecast_output_checks.R",
   "model_comparison_plots.R"
 )
 
@@ -303,7 +303,7 @@ invisible(gc())
 
 # Set parallel plan for HAR model
 future::plan(future::multisession, workers = 4)
-cat("Workers before signature:", future::nbrOfWorkers(), "\n")
+cat("Workers before HAR:", future::nbrOfWorkers(), "\n")
 
 # Select tickers for HAR estimation
 STOCK_TICKERS_HAR <- c(TICKER_SECTOR_TABLE$ticker, "SPY",
@@ -359,22 +359,7 @@ RELATIVE_HAR_TICKERS <- PrepareRelativeHARTickers(
   date_col_name = "date"
 )
 
-# Extra safety: remove DOW from the relative HAR ticker table
-RELATIVE_HAR_TICKERS <- RELATIVE_HAR_TICKERS[
-  RELATIVE_HAR_TICKERS$ticker != "DOW",
-]
-
 rownames(RELATIVE_HAR_TICKERS) <- NULL
-
-# Checks on the cleaned RV to ensure comparability across models
-DAILY_RV_CHECKS <- CheckDailyRVPanelQuality(
-  daily_rv_panel = DAILY_RV_30MIN,
-  ticker_sector_table = TICKER_SECTOR_TABLE,
-  relative_har_tickers = RELATIVE_HAR_TICKERS,
-  market_ticker = "SPY",
-  bad_benchmark_dates = BAD_BENCHMARK_DATES,
-  removed_tickers = c("DOW")
-)
 
 # Use the same stock universe for standard HAR and relative HAR
 STOCK_TICKERS_HAR <- RELATIVE_HAR_TICKERS$ticker
@@ -428,42 +413,6 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 
 
-#_____________________ORTHOGONALIZED_X_HAR_MARKET_SECTOR________________________
-
-# In this section we build and estimate rolling orthogonalized HAR-X
-# market-sector models for realized volatility forecasting. The model keeps the
-# same 9-regressor structure as the raw HAR-X market-sector model, but it uses
-# orthogonalized market, sector and stock-specific components. For each rolling
-# window, the sector component is residualized with respect to the market, and
-# the stock component is residualized with respect to the market and the
-# orthogonal sector component. Then, daily, weekly and monthly HAR components
-# are built from these orthogonalized series and used in one multivariate OLS
-# forecast.
-
-# Set parallel plan for orthogonalized HAR-X model
-future::plan(future::multisession, workers = 4)
-cat("Workers before orthogonalized HAR-X:", future::nbrOfWorkers(), "\n")
-
-# Estimate rolling orthogonalized HAR-X forecasts out-of-sample (1-step ahead)
-HAR_X_ORTHOGONALIZED_MARKET_SECTOR_FORECAST_ERRORS <-
-  RollingOrthogonalizedHARXForecastPanel(
-    daily_log_rv_wide = DAILY_RV_30MIN,
-    relative_har_tickers = RELATIVE_HAR_TICKERS,
-    training_window = 750,
-    market_ticker = "SPY",
-    first_lag = 1,
-    second_lag = 5,
-    third_lag = 22,
-    minimum_observations = 30
-  )
-
-# Reset the parallel plan
-future::plan(future::sequential)
-invisible(gc())
-cat("Workers after reset:", future::nbrOfWorkers(), "\n")
-
-
-
 #_______________________________RELATIVE_HAR____________________________________
 
 # In this section we build and estimate relative HAR models for realized
@@ -491,6 +440,61 @@ RELATIVE_HAR_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
 future::plan(future::sequential)
 invisible(gc())
 cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
+
+#___________________________FORECAST_OUTPUT_CHECKS______________________________
+
+# In this section we check the integrity and alignment of the forecast-error
+# outputs produced by the different realized volatility forecasting models.
+# The checks are performed before any model performance comparison. First, each
+# model output is inspected separately to verify that the required columns are
+# available, dates and tickers are correctly formatted, forecast errors are
+# internally consistent, and no duplicated ticker-date observations are present.
+# Then, the outputs of all models are compared to ensure that they refer to the
+# same ticker universe, target dates, ticker-date pairs, realized actual values
+# and forecast origins. Finally, sector-level metadata are checked for
+# consistency across models and, when available, against the reference
+# ticker-sector table.
+
+MODEL_OUTPUTS <- list(
+  HAR = HAR_FORECAST_ERRORS,
+  HAR_X_MARKET_SECTOR = HAR_X_MARKET_SECTOR_FORECAST_ERRORS,
+  RELATIVE_HAR = RELATIVE_HAR_FORECAST_ERRORS
+)
+
+MODEL_OUTPUT_ALIGNMENT <- CheckForecastOutputAlignment(
+  model_outputs = MODEL_OUTPUTS,
+  reference_model = "HAR",
+  tolerance = 1e-10,
+  verbose = FALSE
+)
+
+MODEL_METADATA_CHECKS <- CheckModelMetadataConsistency(
+  alignment_checks = MODEL_OUTPUT_ALIGNMENT,
+  ticker_sector_table = TICKER_SECTOR_TABLE,
+  market_ticker = "SPY",
+  verbose = FALSE
+)
+
+ALL_MODEL_CHECKS_PASSED <- isTRUE(MODEL_OUTPUT_ALIGNMENT$passed) &&
+  isTRUE(MODEL_METADATA_CHECKS$passed)
+
+if (ALL_MODEL_CHECKS_PASSED) {
+  cat("\nAll model integrity checks passed.\n")
+} else {
+  cat("\nSome model integrity checks failed.\n")
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
