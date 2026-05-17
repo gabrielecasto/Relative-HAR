@@ -38,66 +38,173 @@ BuildDailyRVPanel <- function(DF, tickers, interval_minutes, date_col_name,
     stop("No valid tickers found in DF.", call. = FALSE)
   }
   
+  # Check that interval_minutes is a valid positive integer
+  if (!is.finite(interval_minutes) ||
+      interval_minutes < 1 ||
+      interval_minutes != floor(interval_minutes)) {
+    stop("interval_minutes must be a positive integer.", call. = FALSE)
+  }
+  
+  # Check that minimum_blocks_required is valid
+  if (!is.finite(minimum_blocks_required) ||
+      minimum_blocks_required < 1 ||
+      minimum_blocks_required != floor(minimum_blocks_required)) {
+    stop("minimum_blocks_required must be a positive integer.",
+         call. = FALSE)
+  }
+  
+  interval_minutes <- as.integer(interval_minutes)
+  minimum_blocks_required <- as.integer(minimum_blocks_required)
+  
   # Convert the selected date column into Date format
   date_vector <- as.Date(DF[[date_col_name]])
   
-  # Compute daily log realized variance separately for each ticker
-  rv_list <- future.apply::future_lapply(tickers, function(ticker) {
-    
-    # Keep only date and one-minute returns for the selected ticker
-    stock_data <- data.frame(date = date_vector, return = DF[[ticker]])
-    
-    # Split one-minute returns by trading day
-    returns_by_day <- split(stock_data$return, stock_data$date)
-    
-    # Compute daily realized variance for each trading day
-    ticker_rv_list <- lapply(names(returns_by_day), function(day) {
-      
-      rv_out <- ComputeRVForInterval(
-        returns_1min = returns_by_day[[day]],
-        interval_minutes = interval_minutes,
-        include_partial_last_block = include_partial_last_block
-      )
-      
-      daily_rv <- rv_out$daily_rv
-      n_blocks <- rv_out$n_blocks
-      
-      # Return NA when the daily RV observation is not valid
-      if (!is.finite(daily_rv) ||
-          daily_rv <= 0 ||
-          n_blocks < minimum_blocks_required) {
-        log_daily_rv <- NA_real_
-      } else {
-        log_daily_rv <- log(daily_rv)
-      }
-      
-      data.frame(
-        date = as.Date(day),
-        ticker = ticker,
-        log_daily_rv = log_daily_rv,
-        stringsAsFactors = FALSE
-      )
-    })
-    
-    ticker_rv_panel <- do.call(rbind, ticker_rv_list)
-    
-    return(ticker_rv_panel)
-  })
+  # Match the behavior of split(): rows with missing dates are not used
+  valid_date_rows <- !is.na(date_vector)
+  date_vector <- date_vector[valid_date_rows]
   
-  # Combine all ticker-level daily log RV panels
-  daily_rv_long <- do.call(rbind, rv_list)
-  rownames(daily_rv_long) <- NULL
+  # Extract all selected return columns once
+  returns_matrix <- as.matrix(DF[valid_date_rows, tickers, drop = FALSE])
+  storage.mode(returns_matrix) <- "double"
   
-  # Reshape the dataframe from long to wide format
-  daily_rv_wide <- stats::reshape(
-    daily_rv_long,
-    idvar = "date",
-    timevar = "ticker",
-    direction = "wide"
+  # Split row indices by trading day only once
+  day_index_list <- split(seq_along(date_vector), date_vector)
+  day_dates <- as.Date(names(day_index_list))
+  
+  # Prepare output matrix: one row per day, one column per ticker
+  log_rv_matrix <- matrix(
+    NA_real_,
+    nrow = length(day_index_list),
+    ncol = length(tickers)
   )
   
-  # Clean column names
-  names(daily_rv_wide) <- gsub("log_daily_rv\\.", "", names(daily_rv_wide))
+  colnames(log_rv_matrix) <- tickers
+  
+  # Helper used only when missing patterns differ across tickers
+  ComputeLogRVOneTicker <- function(returns_1min) {
+    
+    returns_1min <- returns_1min[is.finite(returns_1min)]
+    
+    if (length(returns_1min) == 0) {
+      return(NA_real_)
+    }
+    
+    if (!include_partial_last_block) {
+      
+      n_complete <- floor(length(returns_1min) / interval_minutes) *
+        interval_minutes
+      
+      if (n_complete == 0) {
+        return(NA_real_)
+      }
+      
+      returns_1min <- returns_1min[seq_len(n_complete)]
+      n_blocks <- n_complete / interval_minutes
+      
+      interval_returns <- colSums(
+        matrix(returns_1min, nrow = interval_minutes)
+      )
+      
+    } else {
+      
+      block_id <- ((seq_along(returns_1min) - 1L) %/% interval_minutes) + 1L
+      
+      interval_returns <- as.numeric(
+        rowsum(
+          matrix(returns_1min, ncol = 1),
+          group = block_id,
+          reorder = FALSE
+        )
+      )
+      
+      n_blocks <- length(interval_returns)
+    }
+    
+    daily_rv <- sum(interval_returns^2)
+    
+    if (!is.finite(daily_rv) ||
+        daily_rv <= 0 ||
+        n_blocks < minimum_blocks_required) {
+      return(NA_real_)
+    }
+    
+    return(log(daily_rv))
+  }
+  
+  # Compute daily log realized variance day by day
+  for (day_position in seq_along(day_index_list)) {
+    
+    row_index <- day_index_list[[day_position]]
+    day_matrix <- returns_matrix[row_index, , drop = FALSE]
+    
+    finite_matrix <- is.finite(day_matrix)
+    reference_finite <- finite_matrix[, 1]
+    
+    # Fast path: all tickers have the same finite/missing intraday pattern.
+    # This should usually hold after your cleaning, except for unusual cases.
+    common_missing_pattern <- all(finite_matrix == reference_finite)
+    
+    if (common_missing_pattern) {
+      
+      clean_day_matrix <- day_matrix[reference_finite, , drop = FALSE]
+      n_obs <- nrow(clean_day_matrix)
+      
+      if (n_obs == 0) {
+        next
+      }
+      
+      if (!include_partial_last_block) {
+        
+        n_complete <- floor(n_obs / interval_minutes) * interval_minutes
+        
+        if (n_complete == 0) {
+          next
+        }
+        
+        clean_day_matrix <- clean_day_matrix[seq_len(n_complete), ,
+                                             drop = FALSE]
+        n_blocks <- n_complete / interval_minutes
+        
+        block_id <- rep(seq_len(n_blocks), each = interval_minutes)
+        
+      } else {
+        
+        n_blocks <- ceiling(n_obs / interval_minutes)
+        block_id <- ((seq_len(n_obs) - 1L) %/% interval_minutes) + 1L
+      }
+      
+      block_returns <- rowsum(
+        clean_day_matrix,
+        group = block_id,
+        reorder = FALSE
+      )
+      
+      daily_rv <- colSums(block_returns^2)
+      
+      valid_rv <- is.finite(daily_rv) &
+        daily_rv > 0 &
+        n_blocks >= minimum_blocks_required
+      
+      log_rv_matrix[day_position, valid_rv] <- log(daily_rv[valid_rv])
+      
+    } else {
+      
+      # Exact fallback: if tickers have different missing patterns, compute
+      # each ticker separately using the same logic as the original function.
+      for (ticker_position in seq_along(tickers)) {
+        
+        log_rv_matrix[day_position, ticker_position] <-
+          ComputeLogRVOneTicker(day_matrix[, ticker_position])
+      }
+    }
+  }
+  
+  # Build the final wide dataframe directly
+  daily_rv_wide <- data.frame(
+    date = day_dates,
+    as.data.frame(log_rv_matrix, check.names = FALSE),
+    check.names = FALSE
+  )
   
   # Order rows by date
   daily_rv_wide <- daily_rv_wide[order(daily_rv_wide$date), ]
