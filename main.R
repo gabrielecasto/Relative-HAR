@@ -8,7 +8,7 @@
 #________________________________PREPARATION____________________________________
 
 # Clean the environment
-rm(list = ls()); gc()
+#rm(list = ls()); gc()
 
 # Reset the parallel plan
 future::plan(future::sequential)
@@ -27,7 +27,7 @@ sources <- c(
   "HAR_X_market_sector.R",
   "relative_HAR.R",
   "forecast_output_checks.R",
-  "model_comparison_plots.R"
+  "model_comparison_training_windows.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -488,64 +488,68 @@ if (ALL_MODEL_CHECKS_PASSED) {
 
 
 
+#____________________________MODEL_COMPARISON___________________________________
 
+# In this section we estimate HAR, HAR-X market-sector and relative HAR models
+# across different training windows. We store aggregate loss measures (across
+# all stocks and across by sector) and plot them.
 
+# Set parallel plan for model comparison
+future::plan(future::multisession, workers = 4)
+cat("Workers before model comparison:", future::nbrOfWorkers(), "\n")
 
+# Define training windows
+TRAINING_WINDOWS <- seq(50, 800, by = 50)
 
-
-
-
-
-
-
-#___________________________MODEL_COMPARISON_PLOTS______________________________
-
-# In this section we compare the forecasting performance of the standard HAR
-# model and the relative HAR model. Forecasts are matched by ticker and target
-# date, then percentage errors are computed on the log realized variance scale.
-# The script produces sector-level time-series plots, overlapping error
-# histograms, and a summary table comparing mean, median and tail forecast
-# errors across models.
-
-# Build a panel that allows for a graphical and numerical model comparison
-MODEL_COMPARISON <- BuildModelComparisonPanel(
-  har_forecast_errors = HAR_FORECAST_ERRORS,
-  relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS
+MODEL_COMPARISON_RESULTS <- RunModelComparisonAcrossTrainingWindows(
+  daily_log_rv_wide = DAILY_RV_30MIN,
+  relative_har_tickers = RELATIVE_HAR_TICKERS,
+  ticker_sector_table = TICKER_SECTOR_TABLE,
+  training_windows = TRAINING_WINDOWS,
+  rv_interval_minutes = 30,
+  market_ticker = "SPY",
+  first_lag = 1,
+  second_lag = 5,
+  third_lag = 22,
+  minimum_observations = 30,
+  tolerance = 1e-10
 )
 
-MODEL_ALIGNMENT_CHECKS <- CheckHARModelAlignment(
-  har_forecast_errors = HAR_FORECAST_ERRORS,
-  relative_har_forecast_errors = RELATIVE_HAR_FORECAST_ERRORS,
-  model_comparison = MODEL_COMPARISON
+LOSS_PANEL <- MODEL_COMPARISON_RESULTS$loss_panel
+TICKER_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$ticker_losses
+OVERALL_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$overall_losses
+SECTOR_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$sector_losses
+
+# Plot the results, aggregate and by sector
+MODEL_COMPARISON_PLOTS <- PlotModelLossCurvesAcrossTrainingWindows(
+  overall_losses = OVERALL_MODEL_LOSSES,
+  sector_losses = SECTOR_MODEL_LOSSES,
+  output_dir = "figures/model_comparison",
+  save_plots = TRUE
 )
 
-# Plot the percentage out of sample estimation errors for HAR and relative_HAR
-# over time, by sector
-P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR <-
-  PlotPercentageErrorsOverTimeBySector(model_comparison = MODEL_COMPARISON,
-  facet_ncol = 3,
-  output_path = "figures/percentage_errors_over_time_by_sector.pdf"
-)
+# Aggregate results
+P_OVERALL_MSE <- MODEL_COMPARISON_PLOTS$overall_plots$mse
+P_OVERALL_MAE <- MODEL_COMPARISON_PLOTS$overall_plots$mae
+P_OVERALL_QLIKE <- MODEL_COMPARISON_PLOTS$overall_plots$qlike
 
-print(P_PERCENTAGE_ERRORS_OVER_TIME_BY_SECTOR)
+# Results by sector
+P_SECTOR_MSE <- MODEL_COMPARISON_PLOTS$sector_plots$mse
+P_SECTOR_MAE <- MODEL_COMPARISON_PLOTS$sector_plots$mae
+P_SECTOR_QLIKE <- MODEL_COMPARISON_PLOTS$sector_plots$qlike
 
-# Plot the distribution of the percentage out of sample estimation errors
-# for HAR and relative_HAR by sector
-P_PERCENTAGE_ERROR_HISTOGRAMS_BY_SECTOR <- 
-  PlotPercentageErrorHistogramsBySector(model_comparison = MODEL_COMPARISON,
-  bins = 45,
-  cap_quantile = 0.99,
-  facet_ncol = 3,
-  output_path = "figures/percentage_error_histograms_by_sector.pdf"
-)
+print(P_OVERALL_MSE)
+print(P_OVERALL_MAE)
+print(P_OVERALL_QLIKE)
 
-print(P_PERCENTAGE_ERROR_HISTOGRAMS_BY_SECTOR)
+print(P_SECTOR_MSE)
+print(P_SECTOR_MAE)
+print(P_SECTOR_QLIKE)
 
-SECTOR_ERROR_SUMMARY <- BuildSectorErrorSummary(
-  model_comparison = MODEL_COMPARISON
-)
-
-print(SECTOR_ERROR_SUMMARY)
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 
 
