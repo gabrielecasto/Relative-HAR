@@ -27,7 +27,8 @@ sources <- c(
   "HAR_X_market_sector.R",
   "relative_HAR.R",
   "forecast_output_checks.R",
-  "model_comparison_training_windows.R"
+  "model_comparison_training_windows.R",
+  "model_comparison_significance.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -374,6 +375,10 @@ HAR_FORECAST_ERRORS <- RollingHARForecastPanel(
   third_lag = 22
 )
 
+# Remove non used objects
+rm(DT)
+invisible(gc())
+
 # Reset the parallel plan
 future::plan(future::sequential)
 invisible(gc())
@@ -486,6 +491,12 @@ if (ALL_MODEL_CHECKS_PASSED) {
   cat("\nSome model integrity checks failed.\n")
 }
 
+# Remove non used objects
+rm(HAR_FORECAST_ERRORS, HAR_X_MARKET_SECTOR_FORECAST_ERRORS,
+  RELATIVE_HAR_FORECAST_ERRORS, MODEL_OUTPUTS, MODEL_OUTPUT_ALIGNMENT,
+  MODEL_METADATA_CHECKS, ALL_MODEL_CHECKS_PASSED, STOCK_TICKERS_HAR)
+invisible(gc())
+
 
 
 #____________________________MODEL_COMPARISON___________________________________
@@ -517,13 +528,11 @@ MODEL_COMPARISON_RESULTS <- RunModelComparisonAcrossTrainingWindows(
 
 LOSS_PANEL <- MODEL_COMPARISON_RESULTS$loss_panel
 TICKER_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$ticker_losses
-OVERALL_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$overall_losses
-SECTOR_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$sector_losses
 
 # Plot the results, aggregate and by sector
 MODEL_COMPARISON_PLOTS <- PlotModelLossCurvesAcrossTrainingWindows(
-  overall_losses = OVERALL_MODEL_LOSSES,
-  sector_losses = SECTOR_MODEL_LOSSES,
+  overall_losses = MODEL_COMPARISON_RESULTS$overall_losses,
+  sector_losses = MODEL_COMPARISON_RESULTS$sector_losses,
   output_dir = "figures/model_comparison",
   save_plots = TRUE
 )
@@ -546,10 +555,78 @@ print(P_SECTOR_MSE)
 print(P_SECTOR_MAE)
 print(P_SECTOR_QLIKE)
 
+# Remove non used objects
+rm(MODEL_COMPARISON_RESULTS, MODEL_COMPARISON_PLOTS, TRAINING_WINDOWS,
+   DAILY_RV_30MIN, RELATIVE_HAR_TICKERS, TICKER_SECTOR_TABLE, P_OVERALL_MSE,
+   P_OVERALL_MAE, P_OVERALL_QLIKE, P_SECTOR_MSE, P_SECTOR_MAE, P_SECTOR_QLIKE)
+invisible(gc())
+
 # Reset the parallel plan
 future::plan(future::sequential)
 invisible(gc())
 cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
+
+#_______________________RELATIVE_HAR_SIGNIFICANCE_TESTS_________________________
+
+
+
+
+
+
+# Set parallel plan for significance testing
+future::plan(future::multisession, workers=4)
+cat("Workers before significance testing:", future::nbrOfWorkers(), "\n")
+
+RELATIVE_HAR_SIGNIFICANCE <- RunRelativeHARSignificanceTests(
+  loss_panel = LOSS_PANEL,
+  relative_model = "RELATIVE_HAR",
+  benchmark_models = c("HAR", "HAR_X_MARKET_SECTOR"),
+  metrics = c("squared_error", "qlike"),
+  alpha = 0.05,
+  nw_lag = NULL
+)
+
+P_SIGNIFICANT_IMPROVEMENT <- PlotRelativeHARSignificance(
+  summary_by_window = RELATIVE_HAR_SIGNIFICANCE$summary_by_window,
+  test_type = "improvement",
+  output_path = "figures/model_comparison/significant_improvement.pdf"
+)
+
+P_SIGNIFICANT_UNDERPERFORMANCE <- PlotRelativeHARSignificance(
+  summary_by_window = RELATIVE_HAR_SIGNIFICANCE$summary_by_window,
+  test_type = "underperformance",
+  output_path = "figures/model_comparison/significant_underperformance.pdf"
+)
+
+print(P_SIGNIFICANT_IMPROVEMENT)
+print(P_SIGNIFICANT_UNDERPERFORMANCE)
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
