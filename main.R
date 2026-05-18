@@ -571,19 +571,11 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 #_______________________RELATIVE_HAR_SIGNIFICANCE_TESTS_________________________
 
 
-
-
-
-
-# Set parallel plan for significance testing
-future::plan(future::multisession, workers=4)
-cat("Workers before significance testing:", future::nbrOfWorkers(), "\n")
-
 RELATIVE_HAR_SIGNIFICANCE <- RunRelativeHARSignificanceTests(
   loss_panel = LOSS_PANEL,
   relative_model = "RELATIVE_HAR",
   benchmark_models = c("HAR", "HAR_X_MARKET_SECTOR"),
-  metrics = c("squared_error", "qlike"),
+  metrics = c("squared_error", "absolute_error", "qlike"),
   alpha = 0.05,
   nw_lag = NULL
 )

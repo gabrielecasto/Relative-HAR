@@ -13,6 +13,7 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
                                             benchmark_models, metrics, alpha,
                                             nw_lag) {
   
+  # Convert the input to a standard dataframe format
   loss_panel <- as.data.frame(loss_panel)
   
   # Check that the required columns are available
@@ -52,23 +53,29 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
   # Positive differences mean that relative HAR has lower losses.
   ComputeDMWTest <- function(difference_values) {
     
+    # Keep only finite loss differences
     d <- as.numeric(difference_values)
     d <- d[is.finite(d)]
     n_obs <- length(d)
     
+    # Average loss difference used in the DMW statistic
     mean_difference <- mean(d)
     
+    # Select the Newey-West lag automatically, unless supplied by the user
     lag_used <- if (is.null(nw_lag)) {
       floor(4 * (n_obs / 100)^(2 / 9))
     } else {
       as.integer(nw_lag)
     }
     
+    # Make sure the lag is inside the admissible range
     lag_used <- min(max(as.integer(lag_used), 0L), n_obs - 1L)
     
+    # Center the loss-difference series before estimating the long-run variance
     centered_d <- d - mean_difference
     long_run_variance <- sum(centered_d * centered_d) / n_obs
     
+    # Add Newey-West autocovariance terms when the selected lag is positive
     if (lag_used > 0L) {
       
       for (lag in seq_len(lag_used)) {
@@ -83,6 +90,7 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
       }
     }
     
+    # If the long-run variance is not usable, flag the test as invalid
     if (!is.finite(long_run_variance) || long_run_variance <= 0) {
       return(list(
         n_obs = n_obs,
@@ -97,11 +105,14 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
       ))
     }
     
+    # Compute the Diebold-Mariano-West statistic
     dmw_stat <- sqrt(n_obs) * mean_difference / sqrt(long_run_variance)
     
+    # One-sided p-values for improvement and underperformance
     p_improvement <- stats::pnorm(dmw_stat, lower.tail = FALSE)
     p_underperformance <- stats::pnorm(dmw_stat)
     
+    # Classify the result according to the sign and significance of the test
     test_result <- dplyr::case_when(
       mean_difference > 0 && p_improvement < alpha ~
         "significant_improvement",
@@ -129,23 +140,28 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
   
   for (metric in metrics) {
     
+    # Rename squared_error as mse in the final output
     metric_name <- ifelse(metric == "squared_error", "mse", metric)
     
     for (benchmark_model in benchmark_models) {
       
+      # Extract losses for the benchmark model
       benchmark_df <- loss_panel[
         loss_panel$model == benchmark_model,
         c("training_window", "ticker", "sector", "target_date", metric)
       ]
       
+      # Extract losses for the relative HAR model
       relative_df <- loss_panel[
         loss_panel$model == relative_model,
         c("training_window", "ticker", "sector", "target_date", metric)
       ]
       
+      # Standardize loss column names before merging
       names(benchmark_df)[names(benchmark_df) == metric] <- "benchmark_loss"
       names(relative_df)[names(relative_df) == metric] <- "relative_loss"
       
+      # Match benchmark and relative HAR losses on the same ticker-date panel
       comparison_df <- dplyr::inner_join(
         benchmark_df,
         relative_df,
@@ -153,6 +169,7 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
         suffix = c("_benchmark", "_relative")
       )
       
+      # Keep sector information, preferring the relative HAR sector when present
       comparison_df$sector <- ifelse(
         !is.na(comparison_df$sector_relative) &
           nzchar(comparison_df$sector_relative),
@@ -160,15 +177,19 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
         comparison_df$sector_benchmark
       )
       
+      # Positive difference means benchmark loss is larger than
+      # relative HAR loss
       comparison_df$difference <- comparison_df$benchmark_loss -
         comparison_df$relative_loss
       
+      # Keep only valid loss comparisons
       comparison_df <- comparison_df[
         is.finite(comparison_df$benchmark_loss) &
           is.finite(comparison_df$relative_loss) &
           is.finite(comparison_df$difference),
       ]
       
+      # Split the comparison panel by training window and ticker
       group_list <- split(
         comparison_df,
         list(comparison_df$training_window, comparison_df$ticker),
@@ -177,10 +198,13 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
       
       for (group_df in group_list) {
         
+        # Order observations over time before applying the DMW test
         group_df <- group_df[order(group_df$target_date), ]
         
+        # Run the DMW test for one ticker and one training window
         dmw_result <- ComputeDMWTest(group_df$difference)
         
+        # Extract a clean sector label for the ticker
         sector_values <- unique(as.character(group_df$sector))
         sector_values <- sector_values[
           !is.na(sector_values) & nzchar(sector_values)
@@ -190,15 +214,18 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
                                sector_values[1],
                                NA_character_)
         
+        # Compute average losses for the benchmark and relative HAR model
         mean_benchmark_loss <- mean(group_df$benchmark_loss, na.rm = TRUE)
         mean_relative_loss <- mean(group_df$relative_loss, na.rm = TRUE)
         
+        # Express the average loss improvement as a percentage of benchmark loss
         pct_loss_reduction <- ifelse(
           is.finite(mean_benchmark_loss) && mean_benchmark_loss != 0,
           100 * dmw_result$mean_difference / mean_benchmark_loss,
           NA_real_
         )
         
+        # Store stock-level DMW results
         stock_results[[counter]] <- data.frame(
           training_window = unique(group_df$training_window)[1],
           benchmark_model = benchmark_model,
@@ -227,6 +254,7 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
     }
   }
   
+  # Combine all ticker-level tests into one dataframe
   stock_tests <- as.data.frame(data.table::rbindlist(
     stock_results,
     use.names = TRUE,
@@ -254,6 +282,7 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
       .groups = "drop"
     )
   
+  # Return both detailed stock-level tests and aggregate window-level summaries
   return(list(
     stock_tests = stock_tests,
     summary_by_window = summary_by_window
@@ -268,12 +297,13 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
 # significantly improves or underperforms against selected benchmark models.
 # Starting from the summary table produced by RunRelativeHARSignificanceTests(),
 # it builds one line plot across training windows, with separate panels for
-# MSE and QLIKE.
+# MSE, MAE and QLIKE.
 
 PlotRelativeHARSignificance <- function(summary_by_window, test_type,
                                         output_path = NULL, width = 9,
                                         height = 7) {
   
+  # Convert the input to a standard dataframe format
   summary_by_window <- as.data.frame(summary_by_window)
   
   # Check that test_type is valid
@@ -301,18 +331,18 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
     
     percentage_col <- "pct_significant_improvement"
     plot_title <- paste0("Significant Improvement of Relative HAR ",
-      "Across Training Windows")
+                         "Across Training Windows")
     plot_subtitle <- paste0("Percentage of stocks with significant ",
-      "DMW improvement")
+                            "DMW improvement")
     y_label <- "Stocks with significant improvement (%)"
     
   } else {
     
     percentage_col <- "pct_significant_underperformance"
     plot_title <- paste0("Significant Underperformance of Relative HAR ",
-      "Across Training Windows")
+                         "Across Training Windows")
     plot_subtitle <- paste0("Percentage of stocks with significant ",
-      "DMW underperformance")
+                            "DMW underperformance")
     y_label <- "Stocks with significant underperformance (%)"
   }
   
@@ -340,9 +370,12 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
       training_window = as.numeric(training_window),
       benchmark_model = as.character(benchmark_model),
       metric = as.character(metric),
+      
+      # Create clean metric names for the facet labels
       metric_label = dplyr::case_when(
         metric == "mse" ~ "MSE",
         metric == "qlike" ~ "QLIKE",
+        metric == "absolute_error" ~ "MAE",
         TRUE ~ metric
       ),
       significance_pct = as.numeric(.data[[percentage_col]])
@@ -350,6 +383,8 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
     dplyr::filter(
       is.finite(training_window),
       is.finite(significance_pct),
+      
+      # Keep only the benchmark comparisons used in the final plot
       benchmark_model %in% benchmark_order
     )
   
@@ -378,6 +413,8 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
   ) +
     ggplot2::geom_line(linewidth = 0.9) +
     ggplot2::geom_point(size = 2) +
+    
+    # Separate the results by loss metric
     ggplot2::facet_wrap(~ metric_label, ncol = 1) +
     ggplot2::scale_color_manual(
       values = benchmark_colors,
@@ -413,6 +450,8 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
   
   # Save the plot if an output path is provided
   if (!is.null(output_path)) {
+    
+    # Create the output folder only when saving is requested
     dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
     
     ggplot2::ggsave(
@@ -423,5 +462,6 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
     )
   }
   
+  # Return the ggplot object for printing or further customization
   return(p)
 }
