@@ -1,6 +1,18 @@
 
 
 
+# In this section we test whether the relative HAR model provides statistically
+# significant forecasting improvements relative to the benchmark models.
+# Starting from the long LOSS_PANEL produced by the model-comparison section,
+# we compare relative HAR losses with HAR and HAR-X market-sector losses for
+# each stock, training window and loss metric. The loss differences are tested
+# using a Diebold-Mariano-West statistic with Newey-West long-run variance.
+# Finally, we summarize the percentage of stocks showing significant
+# improvement or underperformance and plot these results across training
+# windows.
+
+
+
 #_______________________RELATIVE_HAR_SIGNIFICANCE_TESTS_________________________
 
 # This function tests whether the relative HAR model significantly improves or

@@ -528,6 +528,8 @@ MODEL_COMPARISON_RESULTS <- RunModelComparisonAcrossTrainingWindows(
 
 LOSS_PANEL <- MODEL_COMPARISON_RESULTS$loss_panel
 TICKER_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$ticker_losses
+OVERALL_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$overall_losses
+SECTOR_MODEL_LOSSES <- MODEL_COMPARISON_RESULTS$sector_losses
 
 # Plot the results, aggregate and by sector
 MODEL_COMPARISON_PLOTS <- PlotModelLossCurvesAcrossTrainingWindows(
@@ -542,23 +544,56 @@ P_OVERALL_MSE <- MODEL_COMPARISON_PLOTS$overall_plots$mse
 P_OVERALL_MAE <- MODEL_COMPARISON_PLOTS$overall_plots$mae
 P_OVERALL_QLIKE <- MODEL_COMPARISON_PLOTS$overall_plots$qlike
 
+print(P_OVERALL_MSE)
+print(P_OVERALL_MAE)
+print(P_OVERALL_QLIKE)
+
 # Results by sector
 P_SECTOR_MSE <- MODEL_COMPARISON_PLOTS$sector_plots$mse
 P_SECTOR_MAE <- MODEL_COMPARISON_PLOTS$sector_plots$mae
 P_SECTOR_QLIKE <- MODEL_COMPARISON_PLOTS$sector_plots$qlike
 
-print(P_OVERALL_MSE)
-print(P_OVERALL_MAE)
-print(P_OVERALL_QLIKE)
-
 print(P_SECTOR_MSE)
 print(P_SECTOR_MAE)
 print(P_SECTOR_QLIKE)
 
+# Build a sector-level table of percentage loss reductions relative to HAR
+# for selected training windows. Positive values mean lower losses than HAR.
+SELECTED_TRAINING_WINDOWS <- c(100, 400, 700)
+
+SECTOR_PERCENT_REDUCTION_VS_HAR_TABLE <- SECTOR_MODEL_LOSSES %>%
+  dplyr::filter(training_window %in% SELECTED_TRAINING_WINDOWS) %>%
+  dplyr::group_by(training_window, rv_interval_minutes, sector) %>%
+  dplyr::mutate(har_mse = mse[model == "HAR"][1],
+    har_mae = mae[model == "HAR"][1], har_qlike = qlike[model == "HAR"][1],
+    mse_reduction_vs_har_pct = 100 * (har_mse - mse) / har_mse,
+    mae_reduction_vs_har_pct = 100 * (har_mae - mae) / har_mae,
+    qlike_reduction_vs_har_pct = 100 * (har_qlike - qlike) / har_qlike) %>%
+  dplyr::ungroup() %>%
+  
+  # HAR is the benchmark, so it is excluded from the final table
+  dplyr::filter(model != "HAR") %>%
+  dplyr::select(sector, model, training_window, mse_reduction_vs_har_pct,
+    mae_reduction_vs_har_pct, qlike_reduction_vs_har_pct) %>%
+  tidyr::pivot_longer(cols = c(mse_reduction_vs_har_pct,
+      mae_reduction_vs_har_pct, qlike_reduction_vs_har_pct),
+    names_to = "metric", values_to = "loss_reduction_vs_har_pct") %>%
+  dplyr::mutate(
+    metric = dplyr::case_when(metric == "mse_reduction_vs_har_pct" ~ "MSE",
+      metric == "mae_reduction_vs_har_pct" ~ "MAE",
+      metric == "qlike_reduction_vs_har_pct" ~ "QLIKE", TRUE ~ metric),
+    column_name = paste0(metric, " training = ", training_window),
+    loss_reduction_vs_har_pct = round(loss_reduction_vs_har_pct, 2)) %>%
+  dplyr::select(sector, model, column_name,loss_reduction_vs_har_pct) %>%
+  tidyr::pivot_wider(
+    names_from = column_name, values_from = loss_reduction_vs_har_pct) %>%
+  dplyr::arrange(sector, model)
+
 # Remove non used objects
 rm(MODEL_COMPARISON_RESULTS, MODEL_COMPARISON_PLOTS, TRAINING_WINDOWS,
    DAILY_RV_30MIN, RELATIVE_HAR_TICKERS, TICKER_SECTOR_TABLE, P_OVERALL_MSE,
-   P_OVERALL_MAE, P_OVERALL_QLIKE, P_SECTOR_MSE, P_SECTOR_MAE, P_SECTOR_QLIKE)
+   P_OVERALL_MAE, P_OVERALL_QLIKE, P_SECTOR_MSE, P_SECTOR_MAE, P_SECTOR_QLIKE,
+   OVERALL_MODEL_LOSSES, SECTOR_MODEL_LOSSES)
 invisible(gc())
 
 # Reset the parallel plan
@@ -570,7 +605,18 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 #_______________________RELATIVE_HAR_SIGNIFICANCE_TESTS_________________________
 
+# In this section we test whether the relative HAR model provides statistically
+# significant forecasting improvements relative to the benchmark models.
+# Starting from the long LOSS_PANEL produced by the model-comparison section,
+# we compare relative HAR losses with HAR and HAR-X market-sector losses for
+# each stock, training window and loss metric. The loss differences are tested
+# using a Diebold-Mariano-West statistic with Newey-West long-run variance.
+# Finally, we summarize the percentage of stocks showing significant
+# improvement or underperformance and plot these results across training
+# windows.
 
+# Test whether relative HAR significantly improves or underperforms against
+# HAR and HAR-X market-sector for each training window and loss metric
 RELATIVE_HAR_SIGNIFICANCE <- RunRelativeHARSignificanceTests(
   loss_panel = LOSS_PANEL,
   relative_model = "RELATIVE_HAR",
@@ -580,12 +626,14 @@ RELATIVE_HAR_SIGNIFICANCE <- RunRelativeHARSignificanceTests(
   nw_lag = NULL
 )
 
+# Plot percentage of stocks with significant relative HAR improvements
 P_SIGNIFICANT_IMPROVEMENT <- PlotRelativeHARSignificance(
   summary_by_window = RELATIVE_HAR_SIGNIFICANCE$summary_by_window,
   test_type = "improvement",
   output_path = "figures/model_comparison/significant_improvement.pdf"
 )
 
+# Plot percentage of stocks with significant relative HAR underperformance
 P_SIGNIFICANT_UNDERPERFORMANCE <- PlotRelativeHARSignificance(
   summary_by_window = RELATIVE_HAR_SIGNIFICANCE$summary_by_window,
   test_type = "underperformance",
@@ -594,11 +642,6 @@ P_SIGNIFICANT_UNDERPERFORMANCE <- PlotRelativeHARSignificance(
 
 print(P_SIGNIFICANT_IMPROVEMENT)
 print(P_SIGNIFICANT_UNDERPERFORMANCE)
-
-# Reset the parallel plan
-future::plan(future::sequential)
-invisible(gc())
-cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 
 
