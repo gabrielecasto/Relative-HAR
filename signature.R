@@ -27,6 +27,7 @@ BuildIntervalReturnsForTickerDay <- function(returns_1min, interval_minutes,
   
   # If requested, keep only complete blocks
   if (!include_partial_last_block) {
+    
     n_complete <- floor(length(returns_1min) / interval_minutes) *
       interval_minutes
     
@@ -35,17 +36,27 @@ BuildIntervalReturnsForTickerDay <- function(returns_1min, interval_minutes,
     }
     
     returns_1min <- returns_1min[seq_len(n_complete)]
+    
+    # Fast complete-block aggregation.
+    # Each column of the matrix corresponds to one intraday return block.
+    interval_returns <- colSums(
+      matrix(returns_1min, nrow = interval_minutes)
+    )
+    
+  } else {
+    
+    # Create block identifiers: 1, 1, ..., 2, 2, ..., etc.
+    block_id <- ((seq_along(returns_1min) - 1L) %/% interval_minutes) + 1L
+    
+    # Fast aggregation that also keeps the last partial block, if present.
+    interval_returns <- as.numeric(
+      rowsum(
+        matrix(returns_1min, ncol = 1),
+        group = block_id,
+        reorder = FALSE
+      )
+    )
   }
-  
-  # Create block identifiers: 1, 1, ..., 2, 2, ..., etc.
-  block_id <- ceiling(seq_along(returns_1min) / interval_minutes)
-  
-  # Sum one-minute log returns within each block
-  interval_returns <- tapply(
-    returns_1min,
-    block_id,
-    sum
-  )
   
   return(as.numeric(interval_returns))
 }
@@ -97,28 +108,42 @@ ComputeSignatureForTicker <- function(DF, ticker, intervals,
     stop(paste("DF must contain the column", date_col_name), call. = FALSE)
   }
   
-  # Keep only date and ticker returns
-  stock_data <- data.frame(date = as.Date(DF[[date_col_name]]),
-                           return = DF[[ticker]])
+  # Keep only valid dates and selected ticker returns
+  date_vector <- as.Date(DF[[date_col_name]])
+  return_vector <- DF[[ticker]]
   
-  # Split one-minute returns by trading day
-  returns_by_day <- split(stock_data$return, stock_data$date)
+  # Match the behavior of split(): rows with missing dates are not used
+  valid_date_rows <- !is.na(date_vector)
+  date_vector <- date_vector[valid_date_rows]
+  return_vector <- return_vector[valid_date_rows]
+  
+  # Split one-minute returns by trading day only once
+  returns_by_day <- split(return_vector, date_vector)
   
   signature_list <- lapply(intervals, function(interval_minutes) {
     
-    daily_results <- lapply(returns_by_day, function(day_returns) {
-      ComputeRVForInterval(
-        returns_1min = day_returns,
+    # Pre-allocate daily outputs to avoid creating one small dataframe per day
+    daily_rv <- rep(NA_real_, length(returns_by_day))
+    n_blocks <- rep(0L, length(returns_by_day))
+    
+    for (day_index in seq_along(returns_by_day)) {
+      
+      interval_returns <- BuildIntervalReturnsForTickerDay(
+        returns_1min = returns_by_day[[day_index]],
         interval_minutes = interval_minutes,
         include_partial_last_block = include_partial_last_block
       )
-    })
-    
-    daily_results <- do.call(rbind, daily_results)
+      
+      n_blocks[day_index] <- length(interval_returns)
+      
+      if (length(interval_returns) > 0) {
+        daily_rv[day_index] <- sum(interval_returns^2)
+      }
+    }
     
     # Keep only valid daily RV values
-    valid_rv <- daily_results$daily_rv[is.finite(daily_results$daily_rv)]
-    valid_blocks <- daily_results$n_blocks[daily_results$n_blocks > 0]
+    valid_rv <- daily_rv[is.finite(daily_rv)]
+    valid_blocks <- n_blocks[n_blocks > 0]
     
     if (length(valid_rv) < minimum_days_required) {
       return(data.frame(
@@ -150,6 +175,7 @@ ComputeSignatureForTicker <- function(DF, ticker, intervals,
   })
   
   signature_table <- do.call(rbind, signature_list)
+  rownames(signature_table) <- NULL
   
   return(signature_table)
 }
