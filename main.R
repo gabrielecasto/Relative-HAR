@@ -70,7 +70,7 @@ cat("Workers before import:", future::nbrOfWorkers(), "\n")
 
 # Import minute level data for SP500 tickers, SPY and sector ETFs by importing
 # individual years and binding rows
-IMPORT_YEARS <- 2019:2022
+IMPORT_YEARS <- 2019:2023
 
 INTRADAY_YEAR_LIST <- vector("list", length(IMPORT_YEARS))
 names(INTRADAY_YEAR_LIST) <- as.character(IMPORT_YEARS)
