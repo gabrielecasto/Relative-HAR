@@ -28,7 +28,8 @@ sources <- c(
   "relative_HAR.R",
   "forecast_output_checks.R",
   "model_comparison_training_windows.R",
-  "model_comparison_significance.R"
+  "model_comparison_significance.R",
+  "forecastability_diagnostic.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -647,10 +648,61 @@ print(P_SIGNIFICANT_UNDERPERFORMANCE)
 
 
 
+#_____________________FORECASTABILITY_DIAGNOSTICS_______________________________
 
+# In this section we test whether the relative HAR components are more
+# forecastable than the direct stock log realized variance. We do this for one
+# selected training window by comparing HAR forecasts against a rolling-mean
+# benchmark and computing out-of-sample R-squared values.
 
+# Set parallel plan for forecastability diagnostics
+future::plan(future::multisession, workers = 4)
+cat("Workers before forecastability diagnostics:",
+    future::nbrOfWorkers(), "\n")
 
+# Build the component-level forecastability panel
+FORECASTABILITY_PANEL <- BuildForecastabilityPanel(
+  daily_log_rv_wide = DAILY_RV_30MIN,
+  relative_har_tickers = RELATIVE_HAR_TICKERS,
+  training_window = 500,
+  market_ticker = "SPY",
+  first_lag = 1,
+  second_lag = 5,
+  third_lag = 22,
+  minimum_observations = 30
+)
 
+# Summarize out-of-sample R-squared values
+FORECASTABILITY_RESULTS <- SummarizeForecastabilityR2(
+  forecastability_panel = FORECASTABILITY_PANEL
+)
+
+FORECASTABILITY_COMPONENT_SUMMARY <- FORECASTABILITY_RESULTS$component_summary
+FORECASTABILITY_SECTOR_COMPARISON_TABLE <- 
+  FORECASTABILITY_RESULTS$sector_comparison_table
+
+# Print compact results
+cat("\nForecastability component summary:\n")
+print(FORECASTABILITY_COMPONENT_SUMMARY)
+
+cat("\nForecastability comparison table:\n")
+print(FORECASTABILITY_SECTOR_COMPARISON_TABLE)
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+P_FORECASTABILITY_R2_BY_SECTOR <- PlotForecastabilityR2BoxplotBySector(
+  r2_table = FORECASTABILITY_RESULTS$r2_table,
+  output_path = "figures/model_comparison/forecastability_r2_by_sector.pdf"
+)
+
+print(P_FORECASTABILITY_R2_BY_SECTOR)
+
+# Remove non used objects
+rm(FORECASTABILITY_PANEL, FORECASTABILITY_RESULTS)
+invisible(gc())
 
 
 
