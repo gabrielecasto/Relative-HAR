@@ -343,7 +343,9 @@ RunModelComparisonAcrossTrainingWindows <- function(daily_log_rv_wide,
 
 PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
                                                      sector_losses,
-                                                     output_dir, save_plots) {
+                                                     output_dir, save_plots,
+                                                     overall_x_breaks,
+                                                     sector_x_breaks) {
   
   overall_losses <- as.data.frame(overall_losses)
   sector_losses <- as.data.frame(sector_losses)
@@ -441,9 +443,7 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
       ggplot2::geom_point(size = 2) +
       ggplot2::scale_color_manual(values = model_colors, drop = FALSE) +
       ggplot2::scale_linetype_manual(values = model_linetypes, drop = FALSE) +
-      ggplot2::scale_x_continuous(
-        breaks = sort(unique(overall_plot_df$training_window))
-      ) +
+      ggplot2::scale_x_continuous(breaks = overall_x_breaks) +
       ggplot2::labs(
         title = paste0("Overall ", metric_labels[[metric]],
                        " Across Training Windows"),
@@ -475,9 +475,7 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
       ggplot2::geom_point(size = 1.8) +
       ggplot2::scale_color_manual(values = model_colors, drop = FALSE) +
       ggplot2::scale_linetype_manual(values = model_linetypes, drop = FALSE) +
-      ggplot2::scale_x_continuous(
-        breaks = sort(unique(sector_plot_df$training_window))
-      ) +
+      ggplot2::scale_x_continuous(breaks = sector_x_breaks) +
       ggplot2::facet_wrap(~ sector, scales = "free_y") +
       ggplot2::labs(
         title = paste0("Sector-Level ", metric_labels[[metric]],
