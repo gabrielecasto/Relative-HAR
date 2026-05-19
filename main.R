@@ -703,6 +703,7 @@ print(P_FORECASTABILITY_R2_BY_SECTOR)
 # Remove non used objects
 rm(FORECASTABILITY_PANEL, FORECASTABILITY_RESULTS)
 invisible(gc())
+#AAAAAA
 
 
 

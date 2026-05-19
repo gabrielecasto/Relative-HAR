@@ -35,6 +35,7 @@ ComputeRollingMeanBaseline <- function(series, training_window) {
   
   training_window <- as.integer(training_window)
   
+  # Return an empty vector if the input series is empty
   if (length(series) == 0) {
     return(numeric(0))
   }
