@@ -709,8 +709,13 @@ invisible(gc())
 
 #_______________________RELATIVE_HAR_ERROR_DECOMPOSITION________________________
 
-
-
+# In this section we analyze the forecast-error structure of the relative HAR
+# model. Starting from the relative HAR forecast-error output and the daily log
+# realized variance panel, we reconstruct the realized market, sector-perp and
+# relative q components at each target date. We then decompose the final
+# forecast error into weighted component errors, summarize their contribution
+# to the final MSFE by sector, and plot the squared components together with
+# the cross-term contribution.
 
 # Set parallel plan for relative HAR model
 future::plan(future::multisession, workers=4)
@@ -746,61 +751,14 @@ future::plan(future::sequential)
 invisible(gc())
 cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
-
-
-ERROR_DECOMPOSITION_PLOT_DF <- RELATIVE_HAR_ERROR_DECOMPOSITION_SUMMARY %>%
-  dplyr::select(sector, market_squared_share_pct, sector_squared_share_pct,
-    q_squared_share_pct, total_cross_share_pct) %>%
-  tidyr::pivot_longer(cols = c(market_squared_share_pct,
-      sector_squared_share_pct, q_squared_share_pct, total_cross_share_pct),
-    names_to = "component",values_to = "share_pct") %>%
-  dplyr::mutate(component = dplyr::case_when(
-      component == "market_squared_share_pct" ~ "Market error",
-      component == "sector_squared_share_pct" ~ "Sector-perp error",
-      component == "q_squared_share_pct" ~ "q error",
-      component == "total_cross_share_pct" ~ "Cross terms",
-      TRUE ~ component))
-
-# Plot the results
-component_colors <- c("Market error" = "#1F4E79",
-  "Sector-perp error" = "#6C8EBF", "q error" = "#7A7A7A",
-  "Cross terms" = "#A23E48"
+# Plot results
+P_RELATIVE_HAR_ERROR_DECOMPOSITION <- 
+  PlotRelativeHARErrorDecompositionDiverging(
+  error_decomposition_summary = RELATIVE_HAR_ERROR_DECOMPOSITION_SUMMARY,
+  output_path = "figures/model_comparison/relative_har_error_decomposition.pdf"
 )
 
-P_RELATIVE_HAR_ERROR_DECOMPOSITION <- ggplot2::ggplot(
-  ERROR_DECOMPOSITION_PLOT_DF,
-  ggplot2::aes(x = reorder(sector, share_pct), y = share_pct, fill = component)
-) +
-  ggplot2::geom_col(position = "stack") +
-  ggplot2::geom_hline(yintercept = 0, linetype = "dashed") +
-  ggplot2::scale_fill_manual(values = component_colors) +
-  ggplot2::coord_flip() +
-  ggplot2::labs(
-    title = "Relative HAR Error Decomposition by Sector",
-    subtitle = paste0("Positive bars increase MSFE; ", 
-                      "negative cross terms indicate error compensation"),
-    x = "Sector", y = "Contribution to final MSFE (%)", fill = "Component") +
-  ggplot2::theme_minimal(base_size = 12) +
-  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
-    legend.position = "bottom", panel.grid.minor = ggplot2::element_blank())
-
 print(P_RELATIVE_HAR_ERROR_DECOMPOSITION)
-
-ggplot2::ggsave(
-  filename = "figures/model_comparison/relative_har_error_decomposition.pdf",
-  plot = P_RELATIVE_HAR_ERROR_DECOMPOSITION, width = 10, height = 6)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -1,3 +1,16 @@
+
+
+
+# In this section we analyze the forecast-error structure of the relative HAR
+# model. Starting from the relative HAR forecast-error output and the daily log
+# realized variance panel, we reconstruct the realized market, sector-perp and
+# relative q components at each target date. We then decompose the final
+# forecast error into weighted component errors, summarize their contribution
+# to the final MSFE by sector, and plot the squared components together with
+# the cross-term contribution.
+
+
+
 #____________BUILD_RELATIVE_HAR_ERROR_DECOMPOSITION_PANEL______________________
 
 # This function builds a row-level error decomposition panel for the relative
@@ -476,3 +489,197 @@ SummarizeRelativeHARErrorDecomposition <- function(decomposition_panel) {
   
   return(sector_summary)
 }
+
+
+
+#________PLOT_RELATIVE_HAR_ERROR_DECOMPOSITION_DIVERGING_______________________
+
+# This function plots the sector-level relative HAR error decomposition in one
+# diverging chart. Positive stacked bars show the direct squared-error
+# contributions from market, sector-perp and q errors. The black lollipop shows
+# the total cross-term contribution. Negative cross terms indicate error
+# compensation, while positive cross terms indicate error amplification.
+
+PlotRelativeHARErrorDecompositionDiverging <- function(
+    error_decomposition_summary,
+    output_path = NULL,
+    width = 10,
+    height = 6) {
+  
+  error_decomposition_summary <- as.data.frame(error_decomposition_summary)
+  
+  # Check that the required columns are available
+  required_cols <- c(
+    "sector",
+    "market_squared_share_pct",
+    "sector_squared_share_pct",
+    "q_squared_share_pct",
+    "total_cross_share_pct"
+  )
+  
+  if (!all(required_cols %in% names(error_decomposition_summary))) {
+    
+    missing_cols <- setdiff(required_cols,
+                            names(error_decomposition_summary))
+    
+    stop(
+      paste0(
+        "error_decomposition_summary does not contain the required columns: ",
+        paste(missing_cols, collapse = ", "),
+        "."
+      ),
+      call. = FALSE
+    )
+  }
+  
+  # Standardize variables
+  error_decomposition_summary$sector <- 
+    as.character(error_decomposition_summary$sector)
+  
+  share_cols <- setdiff(required_cols, "sector")
+  
+  for (column_name in share_cols) {
+    error_decomposition_summary[[column_name]] <- suppressWarnings(
+      as.numeric(as.character(error_decomposition_summary[[column_name]]))
+    )
+  }
+  
+  # Keep only valid sector-level observations
+  valid_rows <- !is.na(error_decomposition_summary$sector) &
+    nzchar(error_decomposition_summary$sector) &
+    Reduce(`&`, lapply(share_cols, function(column_name) {
+      is.finite(error_decomposition_summary[[column_name]])
+    }))
+  
+  error_decomposition_summary <- error_decomposition_summary[valid_rows, ]
+  rownames(error_decomposition_summary) <- NULL
+  
+  if (nrow(error_decomposition_summary) == 0) {
+    stop("No valid rows available for the error-decomposition plot.",
+         call. = FALSE)
+  }
+  
+  # Order sectors by the total cross-term contribution
+  sector_order <- error_decomposition_summary %>%
+    dplyr::arrange(total_cross_share_pct) %>%
+    dplyr::pull(sector)
+  
+  # Prepare positive squared-error components
+  squared_df <- error_decomposition_summary %>%
+    dplyr::select(
+      sector,
+      market_squared_share_pct,
+      sector_squared_share_pct,
+      q_squared_share_pct
+    ) %>%
+    tidyr::pivot_longer(
+      cols = c(
+        market_squared_share_pct,
+        sector_squared_share_pct,
+        q_squared_share_pct
+      ),
+      names_to = "component",
+      values_to = "share_pct"
+    ) %>%
+    dplyr::mutate(
+      component = dplyr::case_when(
+        component == "market_squared_share_pct" ~ "Market error",
+        component == "sector_squared_share_pct" ~ "Sector-perp error",
+        component == "q_squared_share_pct" ~ "q error",
+        TRUE ~ component
+      ),
+      sector = factor(sector, levels = sector_order),
+      component = factor(
+        component,
+        levels = c("Market error", "Sector-perp error", "q error")
+      )
+    )
+  
+  # Prepare total cross-term contribution
+  cross_df <- error_decomposition_summary %>%
+    dplyr::select(sector, total_cross_share_pct) %>%
+    dplyr::mutate(
+      sector = factor(sector, levels = sector_order),
+      share_pct = total_cross_share_pct
+    )
+  
+  # Define component colors
+  component_colors <- c(
+    "Market error" = "#1F4E79",
+    "Sector-perp error" = "#6C8EBF",
+    "q error" = "#7A7A7A"
+  )
+  
+  # Build the one-panel diverging error-decomposition plot
+  p <- ggplot2::ggplot() +
+    
+    # Positive side: direct squared-error components
+    ggplot2::geom_col(
+      data = squared_df,
+      ggplot2::aes(x = sector, y = share_pct, fill = component),
+      position = "stack"
+    ) +
+    
+    # Negative side: total cross-term contribution
+    ggplot2::geom_segment(
+      data = cross_df,
+      ggplot2::aes(
+        x = sector,
+        xend = sector,
+        y = 0,
+        yend = share_pct
+      ),
+      linewidth = 0.6,
+      color = "grey35"
+    ) +
+    ggplot2::geom_point(
+      data = cross_df,
+      ggplot2::aes(x = sector, y = share_pct),
+      size = 2.5,
+      color = "black"
+    ) +
+    
+    # Zero reference line
+    ggplot2::geom_hline(
+      yintercept = 0,
+      linetype = "dashed",
+      linewidth = 0.4
+    ) +
+    ggplot2::scale_fill_manual(values = component_colors, drop = FALSE) +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      title = "Relative HAR Error Decomposition by Sector",
+      subtitle = paste0(
+        "Stacked bars show squared-error contributions; ",
+        "black lollipops show cross-term contributions"
+      ),
+      x = "Sector",
+      y = "Contribution to final MSFE (%)",
+      fill = "Squared component"
+    ) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold"),
+      legend.position = "bottom",
+      panel.grid.minor = ggplot2::element_blank()
+    )
+  
+  # Save the plot if an output path is provided
+  if (!is.null(output_path)) {
+    
+    dir.create(dirname(output_path), recursive = TRUE, showWarnings = FALSE)
+    
+    ggplot2::ggsave(
+      filename = output_path,
+      plot = p,
+      width = width,
+      height = height
+    )
+  }
+  
+  return(p)
+}
+
+
+
+#_____________________________END_OF_THE_SCRIPT_________________________________
