@@ -29,7 +29,8 @@ sources <- c(
   "forecast_output_checks.R",
   "model_comparison_training_windows.R",
   "model_comparison_significance.R",
-  "forecastability_diagnostic.R"
+  "forecastability_diagnostic.R",
+  "relative_HAR_error_decomposition.R"
 )
 
 stopifnot(all(file.exists(sources)))
@@ -594,7 +595,7 @@ SECTOR_PERCENT_REDUCTION_VS_HAR_TABLE <- SECTOR_MODEL_LOSSES %>%
 
 # Remove non used objects
 rm(MODEL_COMPARISON_RESULTS, MODEL_COMPARISON_PLOTS, TRAINING_WINDOWS,
-   RELATIVE_HAR_TICKERS, TICKER_SECTOR_TABLE, P_OVERALL_MSE, P_OVERALL_MAE,
+   TICKER_SECTOR_TABLE, P_OVERALL_MSE, P_OVERALL_MAE,
    P_OVERALL_QLIKE, P_SECTOR_MSE, P_SECTOR_MAE, P_SECTOR_QLIKE,
    OVERALL_MODEL_LOSSES, SECTOR_MODEL_LOSSES)
 invisible(gc())
@@ -703,7 +704,35 @@ print(P_FORECASTABILITY_R2_BY_SECTOR)
 # Remove non used objects
 rm(FORECASTABILITY_PANEL, FORECASTABILITY_RESULTS)
 invisible(gc())
-#AAAAAA
+
+
+
+#_______________________RELATIVE_HAR_ERROR_DECOMPOSITION________________________
+
+
+
+
+# Set parallel plan for relative HAR model
+future::plan(future::multisession, workers=4)
+cat("Workers before relative HAR:", future::nbrOfWorkers(), "\n")
+
+RELATIVE_HAR_DECOMPOSITION_FORECAST_ERRORS <- RollingRelativeHARForecastPanel(
+  daily_log_rv_wide = DAILY_RV_30MIN,
+  relative_har_tickers = RELATIVE_HAR_TICKERS,
+  training_window = 750,
+  market_ticker = "SPY",
+  first_lag = 1,
+  second_lag = 5,
+  third_lag = 22,
+  minimum_observations = 30
+)
+
+# Reset the parallel plan
+future::plan(future::sequential)
+invisible(gc())
+cat("Workers after reset:", future::nbrOfWorkers(), "\n")
+
+
 
 
 
