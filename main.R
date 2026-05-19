@@ -649,7 +649,7 @@ print(P_SIGNIFICANT_UNDERPERFORMANCE)
 
 
 
-#_____________________FORECASTABILITY_DIAGNOSTICS_______________________________
+#________________________FORECASTABILITY_DIAGNOSTICS____________________________
 
 # In this section we test whether the relative HAR components are more
 # forecastable than the direct stock log realized variance. We do this for one
