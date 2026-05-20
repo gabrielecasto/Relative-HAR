@@ -665,7 +665,7 @@ cat("Workers before forecastability diagnostics:",
 FORECASTABILITY_PANEL <- BuildForecastabilityPanel(
   daily_log_rv_wide = DAILY_RV_30MIN,
   relative_har_tickers = RELATIVE_HAR_TICKERS,
-  training_window = 100,
+  training_window = 800,
   market_ticker = "SPY",
   first_lag = 1,
   second_lag = 5,
@@ -696,7 +696,7 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 P_FORECASTABILITY_R2_BY_SECTOR <- PlotForecastabilityR2BoxplotBySector(
   r2_table = FORECASTABILITY_RESULTS$r2_table,
-  output_path = "figures/model_comparison/forecastability_r2_by_sector_100.pdf"
+  output_path = "figures/model_comparison/forecastability_r2_by_sector_800.pdf"
 )
 
 print(P_FORECASTABILITY_R2_BY_SECTOR)
