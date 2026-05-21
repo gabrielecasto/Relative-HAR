@@ -273,7 +273,7 @@ P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   upper_band_col = "p75_ratio",
   median_col = "median_ratio",
   reference_interval = 30,
-  x_breaks = c(1, 5, 10, 15, 20, 30, 40, 50, 60, 70),
+  x_breaks = c(1, 10, 20, 30, 40, 50, 60, 70),
   y_limits = NULL,
   title = "Sector-Level Volatility Signature Plot",
   subtitle = "Normalized realized volatility by sector",
