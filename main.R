@@ -260,7 +260,9 @@ P_SIGNATURE_SPAGHETTI <- PlotSignatureSpaghetti(
   y_limits = NULL,
   title = "Volatility Signature Plot",
   subtitle = "Normalized realized volatility across stocks",
-  output_path = "figures/signature_spaghetti.pdf"
+  output_path = "figures/signature_spaghetti.pdf",
+  width = 8.2,
+  height = 5
 )
 
 print(P_SIGNATURE_SPAGHETTI)
@@ -278,7 +280,9 @@ P_SIGNATURE_SECTOR <- PlotSignatureBySector(
   title = "Sector-Level Volatility Signature Plot",
   subtitle = "Normalized realized volatility by sector",
   facet_ncol = 3,
-  output_path = "figures/signature_by_sector.pdf"
+  output_path = "figures/signature_by_sector.pdf",
+  width = 8.2,
+  height = 8.5
 )
 
 print(P_SIGNATURE_SECTOR)
@@ -512,7 +516,7 @@ future::plan(future::multisession, workers = 4)
 cat("Workers before model comparison:", future::nbrOfWorkers(), "\n")
 
 # Define training windows
-TRAINING_WINDOWS <- seq(50, 800, by = 50)
+TRAINING_WINDOWS <- seq(100, 800, by = 50)
 
 MODEL_COMPARISON_RESULTS <- RunModelComparisonAcrossTrainingWindows(
   daily_log_rv_wide = DAILY_RV_30MIN,
@@ -547,10 +551,12 @@ MODEL_COMPARISON_PLOTS <- PlotModelLossCurvesAcrossTrainingWindows(
 P_OVERALL_MSE <- MODEL_COMPARISON_PLOTS$overall_plots$mse
 P_OVERALL_MAE <- MODEL_COMPARISON_PLOTS$overall_plots$mae
 P_OVERALL_QLIKE <- MODEL_COMPARISON_PLOTS$overall_plots$qlike
+P_OVERALL_COMBINED <- MODEL_COMPARISON_PLOTS$overall_combined_plot
 
 print(P_OVERALL_MSE)
 print(P_OVERALL_MAE)
 print(P_OVERALL_QLIKE)
+print(P_OVERALL_COMBINED)
 
 # Results by sector
 P_SECTOR_MSE <- MODEL_COMPARISON_PLOTS$sector_plots$mse
@@ -634,14 +640,18 @@ RELATIVE_HAR_SIGNIFICANCE <- RunRelativeHARSignificanceTests(
 P_SIGNIFICANT_IMPROVEMENT <- PlotRelativeHARSignificance(
   summary_by_window = RELATIVE_HAR_SIGNIFICANCE$summary_by_window,
   test_type = "improvement",
-  output_path = "figures/model_comparison/significant_improvement.pdf"
+  output_path = "figures/model_comparison/significant_improvement.pdf",
+  width = 9,
+  height = 6
 )
 
 # Plot percentage of stocks with significant relative HAR underperformance
 P_SIGNIFICANT_UNDERPERFORMANCE <- PlotRelativeHARSignificance(
   summary_by_window = RELATIVE_HAR_SIGNIFICANCE$summary_by_window,
   test_type = "underperformance",
-  output_path = "figures/model_comparison/significant_underperformance.pdf"
+  output_path = "figures/model_comparison/significant_underperformance.pdf",
+  width = 9,
+  height = 6
 )
 
 print(P_SIGNIFICANT_IMPROVEMENT)
@@ -696,7 +706,9 @@ cat("Workers after reset:", future::nbrOfWorkers(), "\n")
 
 P_FORECASTABILITY_R2_BY_SECTOR <- PlotForecastabilityR2BoxplotBySector(
   r2_table = FORECASTABILITY_RESULTS$r2_table,
-  output_path = "figures/model_comparison/forecastability_r2_by_sector_800.pdf"
+  output_path = "figures/model_comparison/forecastability_r2_by_sector_800.pdf",
+  width = 9,
+  height = 5
 )
 
 print(P_FORECASTABILITY_R2_BY_SECTOR)

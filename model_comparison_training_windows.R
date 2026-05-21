@@ -376,7 +376,13 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
   model_linetypes <- c(
     HAR = "solid",
     HAR_X_MARKET_SECTOR = "dashed",
-    RELATIVE_HAR = "dotdash"
+    RELATIVE_HAR = "solid"
+  )
+  
+  model_shapes <- c(
+    HAR = 16,                  # circle
+    HAR_X_MARKET_SECTOR = 17,  # triangle
+    RELATIVE_HAR = 4           # cross
   )
   
   model_colors <- c(
@@ -399,6 +405,73 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
   
   overall_plots <- list()
   sector_plots <- list()
+  
+  # Build one combined overall plot with MSE, MAE and QLIKE in separate panels
+  overall_combined_df <- overall_losses %>%
+    tidyr::pivot_longer(
+      cols = c(mse, mae, qlike),
+      names_to = "metric",
+      values_to = "loss_value"
+    ) %>%
+    dplyr::mutate(
+      training_window = as.numeric(training_window),
+      loss_value = as.numeric(loss_value),
+      metric_label = dplyr::case_when(
+        metric == "mse" ~ "MSE",
+        metric == "mae" ~ "MAE",
+        metric == "qlike" ~ "QLIKE",
+        TRUE ~ metric
+      )
+    ) %>%
+    dplyr::filter(
+      is.finite(training_window),
+      is.finite(loss_value)
+    )
+  
+  p_overall_combined <- ggplot2::ggplot(
+    overall_combined_df,
+    ggplot2::aes(
+      x = training_window,
+      y = loss_value,
+      group = model,
+      color = model,
+      linetype = model,
+      shape = model
+    )
+  ) +
+    ggplot2::geom_line(linewidth = 0.9) +
+    ggplot2::geom_point(size = 2.5, stroke = 1) +
+    ggplot2::facet_wrap(~ metric_label, ncol = 1, scales = "free_y") +
+    ggplot2::scale_color_manual(values = model_colors, drop = FALSE) +
+    ggplot2::scale_linetype_manual(values = model_linetypes, drop = FALSE) +
+    ggplot2::scale_shape_manual(values = model_shapes, drop = FALSE) +
+    ggplot2::scale_x_continuous(breaks = overall_x_breaks) +
+    ggplot2::labs(
+      title = "Overall Losses Across Training Windows",
+      subtitle = "Average losses across all stocks",
+      x = "Training window",
+      y = "Loss value",
+      color = "Model",
+      linetype = "Model",
+      shape = "Model"
+    ) +
+    ggplot2::theme_minimal(base_size = 13) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold"),
+      strip.text = ggplot2::element_text(face = "bold"),
+      legend.position = "bottom",
+      panel.grid.minor = ggplot2::element_blank()
+    )
+  
+  if (save_plots) {
+    ggplot2::ggsave(
+      filename = file.path(output_dir,
+                           "overall_losses_training_window_combined.pdf"),
+      plot = p_overall_combined,
+      width = 9,
+      height = 14
+    )
+  }
   
   # Build one overall plot and one sector plot for each loss measure
   for (metric in metrics) {
@@ -436,13 +509,15 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
         y = loss_value,
         group = model,
         color = model,
-        linetype = model
+        linetype = model,
+        shape = model
       )
     ) +
       ggplot2::geom_line(linewidth = 0.9) +
       ggplot2::geom_point(size = 2) +
       ggplot2::scale_color_manual(values = model_colors, drop = FALSE) +
       ggplot2::scale_linetype_manual(values = model_linetypes, drop = FALSE) +
+      ggplot2::scale_shape_manual(values = model_shapes, drop = FALSE) +
       ggplot2::scale_x_continuous(breaks = overall_x_breaks) +
       ggplot2::labs(
         title = paste0("Overall ", metric_labels[[metric]],
@@ -451,9 +526,10 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
         x = "Training window",
         y = metric_labels[[metric]],
         color = "Model",
-        linetype = "Model"
+        linetype = "Model",
+        shape = "Model"
       ) +
-      ggplot2::theme_minimal(base_size = 12) +
+      ggplot2::theme_minimal(base_size = 13) +
       ggplot2::theme(
         plot.title = ggplot2::element_text(face = "bold"),
         legend.position = "bottom",
@@ -468,13 +544,15 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
         y = loss_value,
         group = model,
         color = model,
-        linetype = model
+        linetype = model,
+        shape = model
       )
     ) +
-      ggplot2::geom_line(linewidth = 0.8) +
-      ggplot2::geom_point(size = 1.8) +
+      ggplot2::geom_line(linewidth = 0.5) +
+      ggplot2::geom_point(size = 1.2) +
       ggplot2::scale_color_manual(values = model_colors, drop = FALSE) +
       ggplot2::scale_linetype_manual(values = model_linetypes, drop = FALSE) +
+      ggplot2::scale_shape_manual(values = model_shapes, drop = FALSE) +
       ggplot2::scale_x_continuous(breaks = sector_x_breaks) +
       ggplot2::facet_wrap(~ sector, scales = "free_y") +
       ggplot2::labs(
@@ -484,9 +562,10 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
         x = "Training window",
         y = metric_labels[[metric]],
         color = "Model",
-        linetype = "Model"
+        linetype = "Model",
+        shape = "Model"
       ) +
-      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme_minimal(base_size = 18) +
       ggplot2::theme(
         plot.title = ggplot2::element_text(face = "bold"),
         strip.text = ggplot2::element_text(face = "bold"),
@@ -515,13 +594,14 @@ PlotModelLossCurvesAcrossTrainingWindows <- function(overall_losses,
                              paste0("sector_", metric,
                                     "_training_window.pdf")),
         plot = p_sector,
-        width = 13,
-        height = 8
+        width = 15,
+        height = 10
       )
     }
   }
   
   return(list(
+    overall_combined_plot = p_overall_combined,
     overall_plots = overall_plots,
     sector_plots = sector_plots
   ))

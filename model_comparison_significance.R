@@ -303,7 +303,7 @@ RunRelativeHARSignificanceTests <- function(loss_panel, relative_model,
 
 
 
-#___________PLOT_RELATIVE_HAR_SIGNIFICANCE_ACROSS_TRAINING_WINDOWS_____________
+#___________PLOT_RELATIVE_HAR_SIGNIFICANCE_ACROSS_TRAINING_WINDOWS______________
 
 # This function plots the percentage of stocks for which the relative HAR model
 # significantly improves or underperforms against selected benchmark models.
@@ -371,6 +371,11 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
     HAR_X_MARKET_SECTOR = "dashed"
   )
   
+  benchmark_shapes <- c(
+    HAR = 16,                  # circle
+    HAR_X_MARKET_SECTOR = 17   # triangle
+  )
+  
   benchmark_colors <- c(
     HAR = "grey35",
     HAR_X_MARKET_SECTOR = "black"
@@ -420,11 +425,12 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
       y = significance_pct,
       group = benchmark_model,
       color = benchmark_model,
-      linetype = benchmark_model
+      linetype = benchmark_model,
+      shape = benchmark_model
     )
   ) +
     ggplot2::geom_line(linewidth = 0.9) +
-    ggplot2::geom_point(size = 2) +
+    ggplot2::geom_point(size = 2.5, stroke = 1) +
     
     # Separate the results by loss metric
     ggplot2::facet_wrap(~ metric_label, ncol = 1) +
@@ -435,6 +441,11 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
     ) +
     ggplot2::scale_linetype_manual(
       values = benchmark_linetypes,
+      labels = benchmark_labels,
+      drop = FALSE
+    ) +
+    ggplot2::scale_shape_manual(
+      values = benchmark_shapes,
       labels = benchmark_labels,
       drop = FALSE
     ) +
@@ -451,7 +462,8 @@ PlotRelativeHARSignificance <- function(summary_by_window, test_type,
       x = "Training window",
       y = y_label,
       color = "Comparison",
-      linetype = "Comparison"
+      linetype = "Comparison",
+      shape = "Comparison"
     ) +
     ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(

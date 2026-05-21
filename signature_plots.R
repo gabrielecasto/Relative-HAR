@@ -403,11 +403,11 @@ PlotSignatureSpaghetti <- function(signature_plot_df,
       title = title,
       subtitle = subtitle,
       x = "Sampling interval (minutes)",
-      y = "Mean RV / stock-specific plateau RV"
+      y = "Normalized mean daily realized variance"
     ) +
     
     # Use a clean minimal theme
-    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme_minimal(base_size = 13.5) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold"),
       panel.grid.minor = ggplot2::element_blank()
@@ -584,11 +584,11 @@ PlotSignatureBySector <- function(signature_sector_summary,
       title = title,
       subtitle = subtitle,
       x = "Sampling interval (minutes)",
-      y = "Mean RV / stock-specific plateau RV"
+      y = "Normalized mean daily realized variance"
     ) +
     
     # Use a clean minimal theme
-    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme_minimal(base_size = 13.5) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold"),
       panel.grid.minor = ggplot2::element_blank(),

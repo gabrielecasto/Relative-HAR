@@ -989,7 +989,7 @@ PlotForecastabilityR2BoxplotBySector <- function(r2_table,
       y = expression(R[OOS]^2),
       color = "Component"
     ) +
-    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme_minimal(base_size = 13) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold"),
       legend.position = "bottom",
